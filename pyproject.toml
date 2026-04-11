@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "anklesea"
+version = "0.1.0"
+description = "Sizing and torque control of a series elastic actuator for a powered ankle prosthesis, from the Camargo et al. (2021) gait data"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Parmida Mazloomi" }]
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "pandas>=2.1",
+    "mat-io>=1.0",
+    "control>=0.10",
+    "matplotlib>=3.8",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "realdata: needs the Camargo et al. (2021) files in data/raw/ (skipped when absent)",
+]

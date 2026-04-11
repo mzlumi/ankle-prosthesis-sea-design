@@ -12,8 +12,9 @@ venv/
 # Dataset files (downloaded by scripts/fetch_data.py, never committed)
 data/raw/
 
-# Intermediate caches
+# Intermediate caches (per-trial and per-stride derived data, never committed)
 .cache/
+data/processed/
 
 # Build and report artifacts
 build/
