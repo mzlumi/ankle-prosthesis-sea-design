@@ -107,25 +107,48 @@ class DropboxFolder:
                 "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
             },
         )
-        payload = json.loads(self.opener.open(request, timeout=60).read())
-        return payload.get("entries", [])
+        for attempt in range(6):
+            try:
+                payload = json.loads(self.opener.open(request, timeout=60).read())
+                return payload.get("entries", [])
+            except (OSError, ValueError) as error:
+                if attempt == 5:
+                    raise
+                wait = 15 * 2**attempt
+                print(f"  listing failed, retrying in {wait} s ({error})", file=sys.stderr)
+                time.sleep(wait)
+        return []
 
-    def download(self, href: str, target: Path) -> None:
+    def download(self, href: str, target: Path, attempts: int = 6) -> None:
         url = href.replace("dl=0", "dl=1")
         target.parent.mkdir(parents=True, exist_ok=True)
         partial = target.with_suffix(target.suffix + ".part")
-        for attempt in range(3):
+        for attempt in range(attempts):
             try:
                 with self.opener.open(url, timeout=120) as response, open(partial, "wb") as out:
                     while chunk := response.read(1 << 20):
                         out.write(chunk)
+                if not looks_valid(partial):
+                    # Dropbox answers with a web page instead of the file when it throttles requests.
+                    partial.unlink()
+                    raise OSError("Dropbox returned a web page instead of the file (rate limited?)")
                 partial.replace(target)
                 return
             except OSError as error:
-                if attempt == 2:
+                if attempt == attempts - 1:
                     raise
-                print(f"  retrying {target.name} ({error})", file=sys.stderr)
-                time.sleep(5 * (attempt + 1))
+                wait = 15 * 2**attempt
+                print(f"  retrying {target.name} in {wait} s ({error})", file=sys.stderr)
+                time.sleep(wait)
+
+
+def looks_valid(path: Path) -> bool:
+    """MATLAB files must start with the MATLAB header; nothing may be an HTML page."""
+    with open(path, "rb") as handle:
+        head = handle.read(64)
+    if path.name.endswith(".mat.part") or path.suffix == ".mat":
+        return head.startswith(b"MATLAB")
+    return not head.lstrip().lower().startswith((b"<!doctype html", b"<html"))
 
 
 def plan_downloads(
@@ -194,7 +217,7 @@ def main() -> int:
 
     for index, (rel, href, size) in enumerate(files, start=1):
         target = args.out / rel
-        if target.exists() and (size is None or target.stat().st_size == size):
+        if target.exists() and (size is None or target.stat().st_size == size) and looks_valid(target):
             continue
         print(f"[{index}/{len(files)}] {rel}")
         try:

@@ -52,7 +52,7 @@ python scripts/fetch_data.py --subjects all            # about 3.5 GB
 python scripts/fetch_data.py --manual                  # print the manual steps
 ```
 
-Files land in `data/raw/camargo/` with the dataset's own layout. Files already present with the right size are skipped. Dropbox has no documented anonymous API for shared folders, so the script uses the listing request the Dropbox web page makes. If that stops working, the script prints the manual steps: open the Dropbox link from the EPIC Lab page in a browser (no login needed) and download the same folders by hand, or use the Mendeley Data copies.
+Files land in `data/raw/camargo/` with the dataset's own layout. Files already present with the right size are skipped. Every downloaded `.mat` file must start with the MATLAB header: when many requests run in parallel, Dropbox throttles them and answers with a web page instead of the file (seen on 2026-10-06 with 16 parallel downloads), so the script then waits and retries with a growing delay. Keep parallel downloads to a few at a time. Dropbox has no documented anonymous API for shared folders, so the script uses the listing request the Dropbox web page makes. If that stops working, the script prints the manual steps: open the Dropbox link from the EPIC Lab page in a browser (no login needed) and download the same folders by hand, or use the Mendeley Data copies.
 
 ## Motor datasheet
 
