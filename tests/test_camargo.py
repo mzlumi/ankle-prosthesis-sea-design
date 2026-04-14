@@ -16,6 +16,7 @@ from anklesea import camargo
         ("levelground_cw_slow_05_01.mat", "levelground", "slow", None, "cw", 5, 1),
         ("ramp_6_r_01_02", "ramp", "6", "r", None, 1, 2),
         ("stair_2_l_02_03", "stair", "2", "l", None, 2, 3),
+        ("treadmill_04_2_01", "treadmill", "", None, None, 4, 1),
     ],
 )
 def test_parse_trial_name(stem, mode, condition, leg, turn, block, index) -> None:
@@ -28,6 +29,11 @@ def test_parse_trial_name(stem, mode, condition, leg, turn, block, index) -> Non
         block,
         index,
     )
+
+
+def test_parse_repeated_trial() -> None:
+    assert camargo.parse_trial_name("treadmill_04_2_01").repeat == 2
+    assert camargo.parse_trial_name("treadmill_04_01").repeat == 1
 
 
 @pytest.mark.parametrize("stem", ["walk_01_01", "stair_x_l_01_01", "levelground_normal_01_01", "ramp_1_l_01"])

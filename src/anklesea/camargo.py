@@ -35,13 +35,13 @@ INCH = 0.0254
 RAMP_INCLINE_DEG = {1: 5.2, 2: 7.8, 3: 9.2, 4: 11.0, 5: 12.4, 6: 18.0}
 STAIR_HEIGHT_IN = {1: 4.0, 2: 5.0, 3: 6.0, 4: 7.0}
 
+# Trailing numbers: an optional repeat of the same block (``treadmill_04_2_01``) and the index.
+_TAIL = r"(?:_(?P<repeat>\d+))?_(?P<index>\d+)$"
 _NAME_PATTERNS = {
-    "treadmill": re.compile(r"^treadmill_(?P<block>\d+)_(?P<index>\d+)$"),
-    "levelground": re.compile(
-        r"^levelground_(?P<turn>cw|ccw)_(?P<speed>slow|normal|fast)_(?P<block>\d+)_(?P<index>\d+)$"
-    ),
-    "ramp": re.compile(r"^ramp_(?P<level>\d+)_(?P<leg>[lr])_(?P<block>\d+)_(?P<index>\d+)$"),
-    "stair": re.compile(r"^stair_(?P<level>\d+)_(?P<leg>[lr])_(?P<block>\d+)_(?P<index>\d+)$"),
+    "treadmill": re.compile(r"^treadmill_(?P<block>\d+)" + _TAIL),
+    "levelground": re.compile(r"^levelground_(?P<turn>cw|ccw)_(?P<speed>slow|normal|fast)_(?P<block>\d+)" + _TAIL),
+    "ramp": re.compile(r"^ramp_(?P<level>\d+)_(?P<leg>[lr])_(?P<block>\d+)" + _TAIL),
+    "stair": re.compile(r"^stair_(?P<level>\d+)_(?P<leg>[lr])_(?P<block>\d+)" + _TAIL),
 }
 
 
@@ -53,7 +53,8 @@ class TrialName:
     the incline or height index for ramps and stairs (``"1"`` to ``"6"``), and empty for
     the treadmill, whose speed changes within a trial. ``leg`` is the leg letter in the
     ramp and stair names (the leading leg of the transition), ``turn`` the level-ground
-    circuit direction. ``block`` and ``index`` are the two trailing numbers.
+    circuit direction. ``block`` and ``index`` are the two trailing numbers, and
+    ``repeat`` the optional number between them in repeated trials (1 when absent).
     """
 
     stem: str
@@ -63,6 +64,7 @@ class TrialName:
     turn: str | None
     block: int
     index: int
+    repeat: int = 1
 
 
 def parse_trial_name(stem: str) -> TrialName:
@@ -83,6 +85,7 @@ def parse_trial_name(stem: str) -> TrialName:
         turn=parts.get("turn"),
         block=int(parts["block"]),
         index=int(parts["index"]),
+        repeat=int(parts["repeat"]) if parts.get("repeat") else 1,
     )
 
 
