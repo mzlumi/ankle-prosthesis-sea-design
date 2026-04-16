@@ -1,0 +1,101 @@
+# Motor, gearhead and driver used in the actuator model.
+# Values are copied as printed in the datasheets, in the datasheet's own units.
+# anklesea.motor.Motor.from_yaml converts them to SI. Datasheet PDFs are not stored here.
+#
+# The maxon catalog pages were read on 2026-10-06 from the March 2021 edition of the
+# maxon catalog. maxon's own download links return HTTP 403 to scripted requests (they
+# open in a browser); the text was read from distributor copies of the same pages,
+# listed under copy_read, and the values match the excerpts of the maxon-hosted pages.
+
+motor:
+  manufacturer: maxon
+  model: EC-4pole 30, diameter 30 mm, brushless, 200 W, High Power
+  part_number: "305014"
+  winding: 36 V nominal voltage
+  datasheet:
+    title: "EC-4pole 30 \u221030 mm, brushless, 200 watt, High Power"
+    edition: maxon catalog, March 2021 edition, page 261
+    url: https://www.maxongroup.com/medias/sys_master/root/9402694631454/Cataloge-Page-EN-295.pdf
+    copy_read: https://avi-solutions.com/upload/specs/maxon/EC-4pole_30_200W.pdf
+    product_page: https://www.maxongroup.com/maxon/view/content/service_search?query=EC-4pole+30
+    retrieved: "2026-10-06"
+  values:  # datasheet line number in brackets
+    nominal_voltage_V: 36                       # [1]
+    no_load_speed_rpm: 16700                    # [2]
+    no_load_current_mA: 482                     # [3]
+    nominal_speed_rpm: 16100                    # [4]
+    nominal_torque_mNm: 95.2                    # [5] max. continuous torque
+    nominal_current_A: 5.06                     # [6] max. continuous current
+    stall_torque_mNm: 3520                      # [7]
+    stall_current_A: 171                        # [8]
+    max_efficiency_pct: 90                      # [9]
+    terminal_resistance_ohm: 0.21               # [10] phase to phase
+    terminal_inductance_mH: 0.037               # [11] phase to phase
+    torque_constant_mNm_per_A: 20.6             # [12]
+    speed_constant_rpm_per_V: 465               # [13]
+    speed_torque_gradient_rpm_per_mNm: 4.75     # [14]
+    mechanical_time_constant_ms: 1.66           # [15]
+    rotor_inertia_gcm2: 33.3                    # [16]
+    thermal_resistance_housing_ambient_K_per_W: 7.4   # [17]
+    thermal_resistance_winding_housing_K_per_W: 0.21  # [18] as printed
+    thermal_time_constant_winding_s: 2.11       # [19]
+    thermal_time_constant_motor_s: 1180         # [20]
+    max_winding_temperature_C: 155              # [22]
+    max_speed_rpm: 25000                        # [23]
+    pole_pairs: 2                               # [29]
+    weight_g: 300                               # [31]
+  not_in_datasheet:
+    viscous_friction: >-
+      Not given. The model uses an equivalent viscous coefficient from the no-load
+      point, b = k_t * I_0 / omega_0 (no-load friction torque spread linearly over
+      speed). This is an assumption; see docs/assumptions.md.
+    peak_current: >-
+      The motor page gives no short-term current limit (the stall current is a
+      calculated value, not a rating). The peak current limit is taken from the
+      driver below.
+
+gearhead:
+  manufacturer: maxon
+  model: Planetary Gearhead GP 32 HP, diameter 32 mm, 4.0 to 8.0 Nm, High Power
+  part_number: "326666"
+  datasheet:
+    title: "Planetary Gearhead GP 32 HP \u221032 mm, 4.0 - 8.0 Nm, High Power"  # hyphenated as on the maxon product page
+    edition: maxon catalog, March 2021 edition, pages 400 and 401
+    url: https://www.maxongroup.com/medias/sys_master/root/9406824775710/GP-32-HP.pdf
+    copy_read: https://innodrive.ru/upload/iblock/59f/tpax5xmuit361l67c86s19x0x4edbgpr.pdf
+    product_page: https://www.maxongroup.com/maxon/view/product/gear/planetary/gp32/326666
+    retrieved: "2026-10-06"
+  values:
+    reduction: 79                               # [1] 79:1, absolute 3887/49
+    number_of_stages: 3                         # [4]
+    max_continuous_torque_Nm: 8                 # [5] at gear output
+    max_intermittent_torque_Nm: 12              # [6] at gear output
+    max_efficiency_pct: 70                      # [7]
+    weight_g: 213                               # [8]
+    average_backlash_deg: 1.0                   # [9]
+    mass_inertia_gcm2: 0.7                      # [10] at the input
+    max_continuous_input_speed_rpm: 8000        # technical data
+  use_in_model: >-
+    The total motor-to-joint ratio N is the design variable. The gearhead supplies the
+    transmission efficiency (70 %, applied to the whole transmission) and the inertia
+    added at the motor shaft. Its output torque rating (12 Nm intermittent) is far
+    below the ankle torque, so a real actuator needs a final high-force stage (for
+    example a ball screw and lever); that stage is treated as lossless and massless,
+    which is an assumption (docs/assumptions.md). The 8000 rpm input speed rating is
+    reported for each design but not used as a constraint.
+
+driver:
+  manufacturer: maxon
+  model: ESCON 70/10 servo controller
+  part_number: "422969"
+  datasheet:
+    title: ESCON 70/10 Servo Controller, Hardware Reference
+    edition: Edition 2021-08, DocID rel9079
+    url: https://www.maxongroup.com/medias/sys_master/root/9350562709534/422969-ESCON-70-10-Hardware-Reference-En.pdf
+    retrieved: "2026-10-06"
+  note: listed under "Recommended Electronics" on the motor catalog page
+  values:
+    supply_voltage_range_V: [10, 70]
+    max_output_voltage_fraction_of_supply: 0.95
+    continuous_output_current_A: 10
+    peak_output_current_A: 30                   # for less than 20 s

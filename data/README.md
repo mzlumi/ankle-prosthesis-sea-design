@@ -61,6 +61,14 @@ Files land in `data/raw/camargo/` with the dataset's own layout. Files already p
 
 The actuator model needs the constants of a real motor and gearbox (torque constant, winding resistance, rotor inertia, rated and peak current, mass, gearbox efficiency). Choose a motor from a manufacturer's published datasheet, save the values used in a small file in this folder (for example `data/motors/<motor>.yaml`) with the datasheet title, version or date, URL and retrieval date, and cite it in the README. Do not commit the datasheet PDF itself unless its terms allow it; link to it.
 
+**Chosen:** [`motors/maxon_ec4pole30_305014.yaml`](motors/maxon_ec4pole30_305014.yaml), read on 2026-10-06 from the March 2021 maxon catalog:
+
+- Motor: maxon EC-4pole 30, 200 W, 36 V winding, part 305014 (catalog page 261). Torque constant 20.6 mN·m/A, terminal resistance 0.21 Ω, rotor inertia 33.3 g·cm², max. continuous current 5.06 A, max. speed 25000 rpm, 300 g.
+- Gearhead: maxon GP 32 HP, 3 stages, 79:1, part 326666 (catalog pages 400 and 401). Max. efficiency 70 %, input inertia 0.7 g·cm², max. continuous input speed 8000 rpm, 12 N·m intermittent output torque.
+- Driver: maxon ESCON 70/10, part 422969 (Hardware Reference, edition 2021-08), listed as recommended electronics on the motor page: 30 A peak output current, output voltage up to 0.95 of the supply.
+
+maxon's own PDF links refuse scripted downloads (HTTP 403) but open in a browser; the values were read from distributor copies of the same catalog pages (URLs in the YAML file) and match the excerpts of the maxon-hosted pages. No PDF is stored here. Values the datasheets do not give (viscous friction, the efficiency of the final screw-and-lever stage) are assumptions, listed in [`docs/assumptions.md`](../docs/assumptions.md).
+
 ## Not used here
 
 No patient data and no data from Parmida's thesis (IMU and Vicon recordings at Sharif) are used or stored in this repository.
