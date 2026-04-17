@@ -13,6 +13,7 @@ Every assumption that changes a result, with its source or the reason for the va
 | Angle offset | `ik` angles (absolute OpenSim angles), not `ik_offset` | The energy depends only on angle derivatives, and the parallel spring rest angle is a design variable. See `results/gait_profiles.md`. | Not needed |
 
 ## Actuator
+
 | Assumption | Value | Source or reason | Varied in |
 |---|---|---|---|
 | Equivalent DC motor model | `v = R i + L di/dt + k_t omega`, torque `k_t i` | maxon's phase-to-phase resistance and torque constant reproduce the catalog's stall torque and no-load speed in this model (checked in `tests/test_motor.py`). | Not varied |
@@ -23,3 +24,5 @@ Every assumption that changes a result, with its source or the reason for the va
 | Bus voltage | 36 V | The nominal voltage of the chosen winding (part 305014) and a common battery voltage (10-cell lithium-ion pack). The driver delivers at most 0.95 of its supply (ESCON 70/10 datasheet). | 24 V and 48 V |
 | Peak current limit | 30 A | ESCON 70/10 short-time output current (datasheet); the motor page gives no short-term rating. | Not varied |
 | RMS current limit | 5.06 A | Motor nominal (max. continuous) current, the catalog's thermal limit for continuous operation. Comparing it with the RMS over one stride assumes continuous walking. | Not varied |
+| Copper resistance | 0.21 Ω at 25 °C for all temperatures | Datasheet terminal resistance. A hot winding has higher resistance (about 0.39 %/K for copper), so copper losses are underestimated in sustained walking. | Robustness study (motor constant error) |
+| Regeneration | energy reported with ideal regeneration (negative power returned to the battery) and without (negative power dissipated) | The two bound a real driver and battery. Driver losses are ignored. | Both reported |
