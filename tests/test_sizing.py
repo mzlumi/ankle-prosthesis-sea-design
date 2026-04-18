@@ -3,7 +3,7 @@ import pytest
 
 from anklesea.motor import default_motor
 from anklesea.sea import Design, Limits, evaluate_design
-from anklesea.sizing import sweep
+from anklesea.sizing import constrained_optimum, feasible_compliance, quadratic_in_compliance, sweep
 from synthetic import sinusoid_load
 
 
@@ -52,3 +52,75 @@ def test_best_per_ratio_picks_row_minimum(result) -> None:
     _, _, res = result
     idx = res.best_per_ratio()
     assert np.array_equal(idx, np.argmin(res.energy, axis=1))
+
+
+@pytest.mark.parametrize("ratio", [50.0, 150.0, 400.0])
+def test_quadratic_reproduces_full_model(motor, ratio) -> None:
+    load = sinusoid_load(a=0.25, b=100.0, phase=2.6)
+    loose = Limits.from_motor(motor, bus_voltage=1e6)
+    quad = quadratic_in_compliance(load, ratio, motor)
+    for alpha in [0.0, 1e-4, 1e-3, 5e-3, 2e-2]:
+        k = np.inf if alpha == 0.0 else 1.0 / alpha
+        full = evaluate_design(load, Design(k, ratio), motor, loose)["energy"]
+        assert quad.energy(alpha) == pytest.approx(full, rel=1e-9, abs=1e-9)
+
+
+def test_quadratic_is_convex_and_its_minimum_matches_a_fine_search(motor) -> None:
+    load = sinusoid_load(a=0.25, b=100.0, phase=2.6)
+    quad = quadratic_in_compliance(load, 150.0, motor)
+    assert quad.a > 0.0 and quad.b < 0.0
+    alphas = np.linspace(0.0, 4.0 * quad.optimal_compliance, 200001)
+    best = alphas[np.argmin(quad.energy(alphas))]
+    assert best == pytest.approx(quad.optimal_compliance, rel=1e-4)
+    lo, hi = quad.savings_region
+    assert lo == 0.0 and quad.energy(hi) == pytest.approx(quad.c, rel=1e-9)
+    assert quad.energy(0.5 * hi) < quad.c < quad.energy(1.01 * hi)
+
+
+def test_massless_frictionless_motor_gains_nothing_from_the_spring(motor) -> None:
+    # With J = 0 and b = 0 the motor torque tau / (N eta) does not depend on the spring, and
+    # the mechanical power integrates to the joint work over eta for any compliance: a = b = 0.
+    ideal = motor.with_changes(rotor_inertia=0.0, gear_inertia=0.0, viscous_friction=0.0)
+    load = sinusoid_load(a=0.25, b=100.0, phase=2.6)
+    quad = quadratic_in_compliance(load, 150.0, ideal)
+    assert quad.a == pytest.approx(0.0, abs=1e-9) and quad.b == pytest.approx(0.0, abs=1e-6)
+    assert np.isinf(quad.optimal_stiffness)
+
+
+@pytest.mark.parametrize("ratio", [120.0, 250.0, 500.0])
+@pytest.mark.parametrize("thermal", [False, True])
+def test_feasible_interval_matches_full_model(motor, ratio, thermal) -> None:
+    load = sinusoid_load(a=0.25, b=100.0, phase=2.6)
+    limits = Limits(bus_voltage=24.0, peak_current=8.0, rms_current=4.5, max_speed=1500.0, available_voltage=22.8)
+    lo, hi = feasible_compliance(load, ratio, motor, limits, thermal=thermal)
+    key = "feasible" if thermal else "drive_feasible"
+    alphas = np.linspace(0.0, 0.03, 3001)
+    from anklesea.sea import evaluate
+
+    ok = evaluate(load, alphas, np.full_like(alphas, ratio), motor, limits)[key]
+    if np.isnan(lo):
+        assert not ok.any()
+    else:
+        inside = (alphas >= lo) & (alphas <= hi)
+        mismatch = ok != inside
+        # Only grid points within one step of an end of the interval may disagree.
+        step = alphas[1] - alphas[0]
+        near = (np.abs(alphas - lo) <= step) | (np.abs(alphas - hi) <= step)
+        assert not np.any(mismatch & ~near)
+        assert ok.any()
+
+
+def test_constrained_optimum_clips_into_the_interval(motor) -> None:
+    load = sinusoid_load(a=0.25, b=100.0, phase=2.6)
+    none = Limits(bus_voltage=1e6, peak_current=1e6, rms_current=1e6, max_speed=1e6, available_voltage=1e6)
+    quad = quadratic_in_compliance(load, 150.0, motor)
+    lo, hi = feasible_compliance(load, 150.0, motor, none)
+    assert lo == 0.0 and hi > 100.0 * quad.optimal_compliance
+    alpha, energy = constrained_optimum(load, 150.0, motor, none)
+    assert alpha == pytest.approx(quad.optimal_compliance) and energy == pytest.approx(quad.optimal_energy)
+    # A speed limit that the unconstrained optimum breaks moves the optimum to the interval's end.
+    speed = evaluate_design(load, Design(quad.optimal_stiffness, 150.0), motor, none)["peak_speed"]
+    capped = Limits(bus_voltage=1e6, peak_current=1e6, rms_current=1e6, max_speed=0.8 * speed, available_voltage=1e6)
+    lo, hi = feasible_compliance(load, 150.0, motor, capped)
+    alpha_c, energy_c = constrained_optimum(load, 150.0, motor, capped)
+    assert alpha_c in (pytest.approx(lo), pytest.approx(hi)) and energy_c > quad.optimal_energy

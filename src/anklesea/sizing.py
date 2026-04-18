@@ -166,3 +166,80 @@ def quadratic_in_compliance(load: Load, ratio: float, motor: Motor) -> Quadratic
     b = np.sum(2.0 * r_k2 * a1 * b1 + a1 * b2 + a2 * b1) * dt
     c = np.sum(r_k2 * b1**2 + b1 * b2) * dt
     return Quadratic(float(a), float(b), float(c), float(ratio))
+
+
+def _affine_interval(slope: np.ndarray, offset: np.ndarray, bound: float) -> tuple[float, float]:
+    """Compliances ``alpha >= 0`` with ``|slope alpha + offset| <= bound`` at every sample."""
+    lo, hi = 0.0, np.inf
+    flat = slope == 0.0
+    if np.any(np.abs(offset[flat]) > bound):
+        return (np.nan, np.nan)
+    s, o = slope[~flat], offset[~flat]
+    ends = np.stack([(-bound - o) / s, (bound - o) / s])
+    lo = max(lo, float(ends.min(axis=0).max(initial=-np.inf)))
+    hi = min(hi, float(ends.max(axis=0).min(initial=np.inf)))
+    return (lo, hi) if lo <= hi else (np.nan, np.nan)
+
+
+def _quadratic_interval(a: float, b: float, c: float) -> tuple[float, float]:
+    """Compliances ``alpha >= 0`` with ``a alpha^2 + b alpha + c <= 0`` for convex ``a >= 0``."""
+    if a <= 0.0:
+        if b == 0.0:
+            return (0.0, np.inf) if c <= 0.0 else (np.nan, np.nan)
+        root = -c / b
+        return (max(0.0, root), np.inf) if b < 0 else ((0.0, root) if root >= 0 else (np.nan, np.nan))
+    disc = b * b - 4.0 * a * c
+    if disc < 0.0:
+        return (np.nan, np.nan)
+    r1, r2 = (-b - np.sqrt(disc)) / (2.0 * a), (-b + np.sqrt(disc)) / (2.0 * a)
+    lo, hi = max(0.0, r1), r2
+    return (lo, hi) if lo <= hi else (np.nan, np.nan)
+
+
+def feasible_compliance(
+    load: Load, ratio: float, motor: Motor, limits: Limits, thermal: bool = False
+) -> tuple[float, float]:
+    """Interval of compliances that meet the limits at this ratio, ``(nan, nan)`` if none.
+
+    Current, motor speed and voltage are all affine in the compliance at every instant,
+    so each instantaneous limit ``|x(t)| <= bound`` cuts the compliance axis to an interval,
+    and their intersection is an interval too. The RMS current is the square root of a
+    convex quadratic, so ``thermal=True`` intersects one more interval.
+    """
+    from anklesea.sea import _periodic_derivative
+
+    co = affine_coefficients(load, ratio, motor)
+    kt, r, ind = motor.torque_constant, motor.resistance, motor.inductance
+    a_i, b_i = co["a1"] / kt, co["b1"] / kt
+    a_v = r * a_i + ind * _periodic_derivative(a_i, load.dt) + kt * co["a2"]
+    b_v = r * b_i + ind * _periodic_derivative(b_i, load.dt) + kt * co["b2"]
+    intervals = [
+        _affine_interval(a_i, b_i, limits.peak_current),
+        _affine_interval(co["a2"], co["b2"], limits.max_speed),
+        _affine_interval(a_v, b_v, limits.available_voltage),
+    ]
+    if thermal:
+        intervals.append(_quadratic_interval(
+            float(np.mean(a_i**2)), float(2.0 * np.mean(a_i * b_i)), float(np.mean(b_i**2)) - limits.rms_current**2
+        ))
+    lows, highs = zip(*intervals)
+    if np.isnan(lows).any():
+        return (np.nan, np.nan)
+    lo, hi = max(lows), min(highs)
+    return (lo, hi) if lo <= hi else (np.nan, np.nan)
+
+
+def constrained_optimum(
+    load: Load, ratio: float, motor: Motor, limits: Limits, thermal: bool = False
+) -> tuple[float, float]:
+    """Least-energy compliance at this ratio within the limits, and its energy (nan if none).
+
+    A convex function of one variable restricted to an interval is minimized by clipping
+    its unconstrained minimizer into the interval.
+    """
+    lo, hi = feasible_compliance(load, ratio, motor, limits, thermal)
+    if np.isnan(lo):
+        return (np.nan, np.nan)
+    quad = quadratic_in_compliance(load, ratio, motor)
+    alpha = float(np.clip(quad.optimal_compliance, lo, hi))
+    return alpha, float(quad.energy(alpha))

@@ -19,12 +19,18 @@ the whole joint torque, so for a required joint angle ``theta(t)`` and torque
 Why a spring can lower the energy: over a periodic stride the energy the joint needs,
 the integral of ``tau theta_dot``, is fixed by the task, and the spring cannot change it
 (it returns what it stores). What the spring changes is the motor's *path*: its speed
-becomes ``N (theta_dot + tau_dot / k)`` instead of ``N theta_dot``. When the torque
-rises while the joint moves the other way (the ankle storing energy in mid stance
-before push-off), a well-chosen spring cancels part of the motor motion, which
-lowers the inertial and friction torques and the speed at which the motor must turn,
-and so the losses. It cannot remove the copper loss of the torque itself,
-``R (tau / (N eta k_t))^2``, which is independent of ``k``.
+becomes ``N (theta_dot + tau_dot / k)`` instead of ``N theta_dot``. The motor torque
+that drives the load itself, ``tau / (N eta)``, and its copper loss are the same for
+every spring. What the spring changes is the torque that accelerates the rotor,
+``J N (theta_ddot + tau_ddot / k)``, and the friction torque. An ankle needs a high ratio,
+so the rotor inertia seen at the joint, ``J N^2``, is large (about 2 kg m^2 at N = 750,
+some hundred times the foot's), and a rigid actuator spends a large share of its current
+swinging its own rotor back and forth. A spring for which ``tau_dot / k`` cancels part
+of ``theta_dot`` during push-off lets the rotor turn more slowly and evenly. Three
+consequences: with a massless, frictionless motor and ideal regeneration the spring
+would save nothing (checked in ``tests/test_sizing.py``); without regeneration it also
+saves the negative work it stores, which a rigid motor would have to absorb; and it
+lowers the peak motor speed, so the same ratio needs less voltage.
 
 The transmission efficiency is applied as a constant divisor, ``tau / (N eta)``, in
 both directions of power flow. This keeps the energy a quadratic function of the
