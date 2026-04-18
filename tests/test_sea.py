@@ -4,25 +4,7 @@ import pytest
 from anklesea.motor import default_motor
 from anklesea.profiles import Load
 from anklesea.sea import Design, Limits, evaluate, evaluate_design, joint_work, motor_trajectory
-
-PERIOD = 1.2
-W = 2 * np.pi / PERIOD
-
-
-def sinusoid_load(a: float = 0.2, b: float = 80.0, phase: float = 0.7, n: int = 4000) -> Load:
-    """theta = a sin(w t), tau = b sin(w t + phase)."""
-    t = np.arange(n) * PERIOD / n
-    return Load(
-        t=t,
-        angle=a * np.sin(W * t),
-        velocity=a * W * np.cos(W * t),
-        acceleration=-a * W**2 * np.sin(W * t),
-        torque=b * np.sin(W * t + phase),
-        torque_rate=b * W * np.cos(W * t + phase),
-        torque_accel=-b * W**2 * np.sin(W * t + phase),
-        period=PERIOD,
-    )
-
+from synthetic import PERIOD, W, sinusoid_load
 
 @pytest.fixture(scope="module")
 def motor():

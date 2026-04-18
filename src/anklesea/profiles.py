@@ -16,7 +16,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from anklesea import RESULTS_DIR
+
 DEFAULT_HARMONICS = 20
+PROFILE_CSV = RESULTS_DIR / "profiles" / "gait_profiles.csv"
 
 
 @dataclass(frozen=True)
@@ -133,7 +136,7 @@ class GaitProfile:
         return load_from_cycle(self.angle, self.moment_per_kg * mass, self.stride_time, n_samples, n_harmonics)
 
 
-def read_profiles(path: Path) -> dict[tuple[str, str], GaitProfile]:
+def read_profiles(path: Path = PROFILE_CSV) -> dict[tuple[str, str], GaitProfile]:
     """Read the aggregate CSV written by ``scripts/gait_profiles.py``."""
     frame = pd.read_csv(path, comment="#")
     out = {}

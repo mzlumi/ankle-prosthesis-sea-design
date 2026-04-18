@@ -1,4 +1,4 @@
-"""Write small synthetic trials in the same file layout as the Camargo et al. (2021) data."""
+"""Synthetic test inputs: trials in the Camargo et al. (2021) file layout and periodic loads."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ from pathlib import Path
 import matio
 import numpy as np
 import pandas as pd
+
+from anklesea.profiles import Load
 
 FS = 200.0
 
@@ -102,3 +104,22 @@ def write_subject_info(raw_dir: Path, masses: dict[str, float]) -> None:
         }
     )
     matio.save_to_mat(str(raw_dir / "SubjectInfo.mat"), {"data": table}, version="v7")
+
+
+PERIOD = 1.2
+W = 2 * np.pi / PERIOD
+
+
+def sinusoid_load(a: float = 0.2, b: float = 80.0, phase: float = 0.7, n: int = 4000) -> Load:
+    """theta = a sin(w t), tau = b sin(w t + phase)."""
+    t = np.arange(n) * PERIOD / n
+    return Load(
+        t=t,
+        angle=a * np.sin(W * t),
+        velocity=a * W * np.cos(W * t),
+        acceleration=-a * W**2 * np.sin(W * t),
+        torque=b * np.sin(W * t + phase),
+        torque_rate=b * W * np.cos(W * t + phase),
+        torque_accel=-b * W**2 * np.sin(W * t + phase),
+        period=PERIOD,
+    )
