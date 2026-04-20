@@ -23,18 +23,11 @@ import numpy as np
 import pandas as pd
 
 from anklesea import PROCESSED_DIR, RESULTS_DIR, camargo, strides
+from anklesea.plots import ACTIVITY_COLORS
 from anklesea.profiles import read_profiles
 
 CITATION = "Data: Camargo et al. (2021), J. Biomech. 119:110320, CC BY 4.0."
 PROFILE_CSV = RESULTS_DIR / "profiles" / "gait_profiles.csv"
-ACTIVITY_COLORS = {
-    "treadmill": "#1f77b4",
-    "levelground": "#17becf",
-    "rampascent": "#d62728",
-    "rampdescent": "#ff9896",
-    "stairascent": "#2ca02c",
-    "stairdescent": "#98df8a",
-}
 
 
 def subject_strides(subject: str, rebuild: bool = False) -> pd.DataFrame:

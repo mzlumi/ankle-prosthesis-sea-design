@@ -2,8 +2,14 @@ import numpy as np
 import pytest
 
 from anklesea.motor import default_motor
-from anklesea.sea import Design, Limits, evaluate_design
-from anklesea.sizing import constrained_optimum, feasible_compliance, quadratic_in_compliance, sweep
+from anklesea.sea import Design, Limits, evaluate, evaluate_design
+from anklesea.sizing import (
+    constrained_optimum,
+    feasible_compliance,
+    optimize,
+    quadratic_in_compliance,
+    sweep,
+)
 from synthetic import sinusoid_load
 
 
@@ -87,27 +93,28 @@ def test_massless_frictionless_motor_gains_nothing_from_the_spring(motor) -> Non
     assert np.isinf(quad.optimal_stiffness)
 
 
-@pytest.mark.parametrize("ratio", [120.0, 250.0, 500.0])
+LIGHT = dict(a=0.25, b=60.0, phase=2.6)
+MID_LIMITS = Limits(bus_voltage=36.0, peak_current=20.0, rms_current=7.0, max_speed=2600.0, available_voltage=30.0)
+
+
+@pytest.mark.parametrize("ratio", [250.0, 350.0, 500.0])
 @pytest.mark.parametrize("thermal", [False, True])
 def test_feasible_interval_matches_full_model(motor, ratio, thermal) -> None:
-    load = sinusoid_load(a=0.25, b=100.0, phase=2.6)
-    limits = Limits(bus_voltage=24.0, peak_current=8.0, rms_current=4.5, max_speed=1500.0, available_voltage=22.8)
-    lo, hi = feasible_compliance(load, ratio, motor, limits, thermal=thermal)
+    load = sinusoid_load(**LIGHT)
+    lo, hi = feasible_compliance(load, ratio, motor, MID_LIMITS, thermal=thermal)
+    if not thermal or ratio == 500.0:
+        assert 0.0 <= lo < hi < np.inf
     key = "feasible" if thermal else "drive_feasible"
     alphas = np.linspace(0.0, 0.03, 3001)
-    from anklesea.sea import evaluate
-
-    ok = evaluate(load, alphas, np.full_like(alphas, ratio), motor, limits)[key]
+    ok = evaluate(load, alphas, np.full_like(alphas, ratio), motor, MID_LIMITS)[key]
     if np.isnan(lo):
         assert not ok.any()
     else:
         inside = (alphas >= lo) & (alphas <= hi)
-        mismatch = ok != inside
         # Only grid points within one step of an end of the interval may disagree.
         step = alphas[1] - alphas[0]
         near = (np.abs(alphas - lo) <= step) | (np.abs(alphas - hi) <= step)
-        assert not np.any(mismatch & ~near)
-        assert ok.any()
+        assert not np.any((ok != inside) & ~near)
 
 
 def test_constrained_optimum_clips_into_the_interval(motor) -> None:
@@ -124,3 +131,33 @@ def test_constrained_optimum_clips_into_the_interval(motor) -> None:
     lo, hi = feasible_compliance(load, 150.0, motor, capped)
     alpha_c, energy_c = constrained_optimum(load, 150.0, motor, capped)
     assert alpha_c in (pytest.approx(lo), pytest.approx(hi)) and energy_c > quad.optimal_energy
+
+
+def test_optimize_matches_or_beats_the_grid(motor) -> None:
+    load = sinusoid_load(**LIGHT)
+    ratios = np.geomspace(100.0, 800.0, 200)
+    grid = sweep(load, motor, MID_LIMITS, np.concatenate([np.geomspace(30.0, 20000.0, 200), [np.inf]]), ratios)
+    for thermal, key in [(False, "drive_feasible"), (True, "feasible")]:
+        best = optimize(load, motor, MID_LIMITS, ratios=ratios, thermal=thermal)
+        ref = grid.optimum(constraint=key)
+        assert best[key]
+        assert best["energy"] <= ref["energy"] * (1 + 1e-9)
+        assert best["energy"] == pytest.approx(ref["energy"], rel=0.01)
+
+
+def test_optimum_on_a_limit_passes_the_full_model_check(motor) -> None:
+    # The voltage-limited optimum lies on the boundary; round-off must not flag it.
+    load = sinusoid_load(**LIGHT)
+    limits = Limits(bus_voltage=36.0, peak_current=40.0, rms_current=40.0, max_speed=5000.0, available_voltage=12.0)
+    for n in np.geomspace(150.0, 700.0, 40):
+        alpha, _ = constrained_optimum(load, n, motor, limits)
+        if np.isfinite(alpha):
+            k = np.inf if alpha == 0.0 else 1.0 / alpha
+            assert evaluate_design(load, Design(k, n), motor, limits)["drive_feasible"]
+
+
+def test_optimize_reports_no_design_when_limits_cannot_be_met(motor) -> None:
+    load = sinusoid_load(a=0.25, b=100.0, phase=2.6)
+    impossible = Limits(bus_voltage=1.0, peak_current=0.1, rms_current=0.1, max_speed=10.0, available_voltage=1.0)
+    best = optimize(load, motor, impossible, ratios=np.geomspace(30.0, 600.0, 20))
+    assert np.isnan(best["ratio"]) and not best["feasible"]

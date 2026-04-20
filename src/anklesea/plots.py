@@ -13,6 +13,23 @@ from anklesea.sizing import SweepResult
 
 CITATION = "Data: Camargo et al. (2021), J. Biomech. 119:110320, CC BY 4.0."
 
+ACTIVITY_COLORS = {
+    "treadmill": "#1f77b4",
+    "levelground": "#17becf",
+    "rampascent": "#d62728",
+    "rampdescent": "#ff9896",
+    "stairascent": "#2ca02c",
+    "stairdescent": "#98df8a",
+}
+ACTIVITY_NAMES = {
+    "treadmill": "treadmill",
+    "levelground": "level ground",
+    "rampascent": "ramp ascent",
+    "rampdescent": "ramp descent",
+    "stairascent": "stair ascent",
+    "stairdescent": "stair descent",
+}
+
 LIMIT_STYLES = {
     "ok_voltage": ("voltage limit", "#b45309", "-"),
     "ok_peak_current": ("peak current limit", "#7c3aed", "--"),
@@ -29,6 +46,9 @@ def energy_contour(
 ) -> tuple[object, list[Line2D]]:
     """Filled contour of energy per stride over (k, N), with limit boundaries.
 
+    Levels are log-spaced, or linear when the energy reaches zero or below (a load that
+    returns net energy through regeneration, such as stair descent).
+
     The rigid column (``k = inf``) is left out of the contour. Returns the contour set
     (for a colorbar) and legend handles for the drawn limit lines.
     """
@@ -38,7 +58,7 @@ def energy_contour(
     if vmax is None:
         vmax = float(np.nanpercentile(energy, 60))
     vmin = float(np.nanmin(energy))
-    levels = np.geomspace(vmin, vmax, 15)
+    levels = np.geomspace(vmin, vmax, 15) if vmin > 0 else np.linspace(vmin, vmax, 15)
     cs = ax.contourf(k, n, np.clip(energy, vmin, vmax), levels=levels, cmap="viridis_r", extend="max")
     ax.contour(k, n, energy, levels=levels[::2], colors="white", linewidths=0.4, alpha=0.6)
     handles = []

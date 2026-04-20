@@ -243,3 +243,33 @@ def constrained_optimum(
     quad = quadratic_in_compliance(load, ratio, motor)
     alpha = float(np.clip(quad.optimal_compliance, lo, hi))
     return alpha, float(quad.energy(alpha))
+
+
+def optimize(
+    load: Load,
+    motor: Motor,
+    limits: Limits,
+    ratios: np.ndarray | None = None,
+    thermal: bool = False,
+) -> dict[str, float]:
+    """Least-energy design within the limits: a scan over the ratio with the clipped closed form.
+
+    Returns the full model's metrics at the optimum (see :func:`anklesea.sea.evaluate`) plus
+    ``stiffness``, ``ratio`` and ``compliance``; ``ratio`` is NaN and ``feasible`` False when
+    no design meets the limits. ``drive_feasible`` limits are always imposed, the RMS current
+    only with ``thermal=True``.
+    """
+    ratios = np.geomspace(30.0, 2000.0, 600) if ratios is None else np.asarray(ratios, dtype=float)
+    best = (np.inf, np.nan, np.nan)
+    for n in ratios:
+        alpha, energy = constrained_optimum(load, n, motor, limits, thermal)
+        if np.isfinite(energy) and energy < best[0]:
+            best = (energy, alpha, n)
+    _, alpha, n = best
+    if np.isnan(n):
+        return {"stiffness": np.nan, "ratio": np.nan, "compliance": np.nan, "feasible": False,
+                "drive_feasible": False}
+    metrics = evaluate(load, alpha, n, motor, limits)
+    out = {key: value.item() for key, value in metrics.items()}
+    out.update(stiffness=np.inf if alpha == 0.0 else 1.0 / alpha, ratio=float(n), compliance=float(alpha))
+    return out

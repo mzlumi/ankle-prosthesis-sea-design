@@ -60,6 +60,8 @@ import numpy as np
 from anklesea.motor import Motor
 from anklesea.profiles import Load
 
+LIMIT_TOLERANCE = 1e-9  # relative; an optimum on a limit must not fail the check by round-off
+
 
 @dataclass(frozen=True)
 class Design:
@@ -173,10 +175,11 @@ def evaluate(
         "peak_speed": np.abs(traj["motor_speed"]).max(axis=-1),
         "peak_deflection": np.abs(traj["spring_deflection"]).max(axis=-1),
     }
-    out["ok_voltage"] = out["peak_voltage"] <= limits.available_voltage
-    out["ok_peak_current"] = out["peak_current"] <= limits.peak_current
-    out["ok_rms_current"] = out["rms_current"] <= limits.rms_current
-    out["ok_speed"] = out["peak_speed"] <= limits.max_speed
+    slack = 1.0 + LIMIT_TOLERANCE
+    out["ok_voltage"] = out["peak_voltage"] <= limits.available_voltage * slack
+    out["ok_peak_current"] = out["peak_current"] <= limits.peak_current * slack
+    out["ok_rms_current"] = out["rms_current"] <= limits.rms_current * slack
+    out["ok_speed"] = out["peak_speed"] <= limits.max_speed * slack
     out["drive_feasible"] = out["ok_voltage"] & out["ok_peak_current"] & out["ok_speed"]
     out["feasible"] = out["drive_feasible"] & out["ok_rms_current"]
     out["ok_gear_speed"] = out["peak_speed"] <= motor.gear_max_input_speed
