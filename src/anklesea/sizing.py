@@ -37,6 +37,12 @@ DESIGN_MASS_KG = 80.0  # docs/assumptions.md: ISO 10328 loading level P4
 BUS_VOLTAGE = 36.0  # docs/assumptions.md: nominal voltage of the chosen winding
 LEVEL_WALK = ("treadmill", "1.20 m/s")
 
+# Share of steps per activity in free-living use of a transtibial prosthesis (Srisuwan and Klute,
+# Prosthet. Orthot. Int. 45(3):191-197, 2021, Table 3); turning steps are counted as level walking.
+DAILY_MIX = {"level": 0.828 + 0.090, "rampascent": 0.016, "rampdescent": 0.020, "stairascent": 0.023,
+             "stairdescent": 0.025}
+STEPS_PER_DAY = 4422  # same source, mean over 1 to 2 weekdays
+
 
 @dataclass
 class SweepResult:
@@ -222,10 +228,10 @@ def feasible_compliance(
         intervals.append(_quadratic_interval(
             float(np.mean(a_i**2)), float(2.0 * np.mean(a_i * b_i)), float(np.mean(b_i**2)) - limits.rms_current**2
         ))
-    lows, highs = zip(*intervals)
-    if np.isnan(lows).any():
+    bounds = np.array(intervals)
+    if np.isnan(bounds).any():
         return (np.nan, np.nan)
-    lo, hi = max(lows), min(highs)
+    lo, hi = float(bounds[:, 0].max()), float(bounds[:, 1].min())
     return (lo, hi) if lo <= hi else (np.nan, np.nan)
 
 
@@ -273,3 +279,48 @@ def optimize(
     out = {key: value.item() for key, value in metrics.items()}
     out.update(stiffness=np.inf if alpha == 0.0 else 1.0 / alpha, ratio=float(n), compliance=float(alpha))
     return out
+
+
+def optimize_mix(
+    loads: list[Load],
+    weights: list[float],
+    motor: Motor,
+    limits: Limits,
+    ratios: np.ndarray | None = None,
+    thermal: bool = False,
+) -> dict[str, float]:
+    """One design for several activities: least weighted energy, within the limits in every activity.
+
+    The objective ``sum_m w_m E_m(alpha)`` is a sum of convex quadratics in compliance, so it is
+    a convex quadratic itself, and the compliances allowed in every activity are the
+    intersection of the per-activity intervals. At each ratio the clipped closed form gives
+    the optimum, as in :func:`constrained_optimum`. Returns ``stiffness``, ``ratio``,
+    ``compliance`` and ``weighted_energy`` (J per stride, weights normalized to sum to 1);
+    ``ratio`` is NaN if no design meets the limits in every activity.
+    """
+    ratios = np.geomspace(30.0, 2000.0, 600) if ratios is None else np.asarray(ratios, dtype=float)
+    w = np.asarray(weights, dtype=float) / float(np.sum(weights))
+    best = (np.inf, np.nan, np.nan)
+    for n in ratios:
+        intervals = np.array([feasible_compliance(load, n, motor, limits, thermal) for load in loads])
+        if np.isnan(intervals).any():
+            continue
+        lo, hi = float(intervals[:, 0].max()), float(intervals[:, 1].min())
+        if lo > hi:
+            continue
+        quads = [quadratic_in_compliance(load, n, motor) for load in loads]
+        combined = Quadratic(
+            a=float(sum(wi * q.a for wi, q in zip(w, quads))),
+            b=float(sum(wi * q.b for wi, q in zip(w, quads))),
+            c=float(sum(wi * q.c for wi, q in zip(w, quads))),
+            ratio=float(n),
+        )
+        alpha = float(np.clip(combined.optimal_compliance, lo, hi))
+        energy = float(combined.energy(alpha))
+        if energy < best[0]:
+            best = (energy, alpha, n)
+    energy, alpha, n = best
+    if np.isnan(n):
+        return {"stiffness": np.nan, "ratio": np.nan, "compliance": np.nan, "weighted_energy": np.nan}
+    return {"stiffness": np.inf if alpha == 0.0 else 1.0 / alpha, "ratio": float(n), "compliance": alpha,
+            "weighted_energy": energy}

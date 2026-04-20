@@ -26,3 +26,11 @@ Every assumption that changes a result, with its source or the reason for the va
 | RMS current limit | 5.06 A | Motor nominal (max. continuous) current, the catalog's thermal limit for continuous operation. Comparing it with the RMS over one stride assumes continuous walking. | Not varied |
 | Copper resistance | 0.21 Ω at 25 °C for all temperatures | Datasheet terminal resistance. A hot winding has higher resistance (about 0.39 %/K for copper), so copper losses are underestimated in sustained walking. | Robustness study (motor constant error) |
 | Regeneration | energy reported with ideal regeneration (negative power returned to the battery) and without (negative power dissipated) | The two bound a real driver and battery. Driver losses are ignored. | Both reported |
+
+## Activity mix for the compromise design
+
+| Assumption | Value | Source or reason | Varied in |
+|---|---|---|---|
+| Share of steps per activity | level 91.8 % (82.8 % straight plus 9.0 % turning), ramp ascent 1.6 %, ramp descent 2.0 %, stair ascent 2.3 %, stair descent 2.5 % | B. Srisuwan and G. K. Klute, "Locomotor activities of individuals with lower limb amputation", *Prosthet. Orthot. Int.* 45(3):191-197, 2021, doi:10.1097/PXR.0000000000000009, Table 3: ten people with a unilateral transtibial prosthesis, free-living, 1 to 2 weekdays, classified from a pylon-mounted sensor. Turning steps are counted as level walking. | `results/cross_mode.md`: ramps and stairs three times as frequent, equal weights, level walking only |
+| Steps per day | 4422 (2211 strides of the prosthetic leg) | Same source. Only scales the daily energy, not the design. | Not varied |
+| Condition standing for each activity | treadmill 1.2 m/s; ramp incline and stair height closest to the source's course (5 degree ramps, 18 cm stair rise) among well-covered conditions | The mix source's course geometry; the dataset offers several inclines and step heights. | Lowest and highest inclines and step heights; walking at 1.0 and 1.4 m/s |

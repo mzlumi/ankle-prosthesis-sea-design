@@ -7,6 +7,7 @@ from anklesea.sizing import (
     constrained_optimum,
     feasible_compliance,
     optimize,
+    optimize_mix,
     quadratic_in_compliance,
     sweep,
 )
@@ -161,3 +162,35 @@ def test_optimize_reports_no_design_when_limits_cannot_be_met(motor) -> None:
     impossible = Limits(bus_voltage=1.0, peak_current=0.1, rms_current=0.1, max_speed=10.0, available_voltage=1.0)
     best = optimize(load, motor, impossible, ratios=np.geomspace(30.0, 600.0, 20))
     assert np.isnan(best["ratio"]) and not best["feasible"]
+
+
+def test_mix_of_one_activity_is_the_single_optimum(motor) -> None:
+    load = sinusoid_load(**LIGHT)
+    ratios = np.geomspace(100.0, 800.0, 80)
+    single = optimize(load, motor, MID_LIMITS, ratios=ratios)
+    mix = optimize_mix([load, load], [0.3, 0.7], motor, MID_LIMITS, ratios=ratios)
+    assert mix["ratio"] == single["ratio"]
+    assert mix["stiffness"] == pytest.approx(single["stiffness"])
+    assert mix["weighted_energy"] == pytest.approx(single["energy"], rel=1e-9)
+
+
+def test_mix_matches_brute_force_and_is_feasible_in_every_activity(motor) -> None:
+    # The second load is faster and lighter: infeasible at high ratios (voltage), unlike the first.
+    loads = [sinusoid_load(**LIGHT), sinusoid_load(a=0.4, b=30.0, phase=2.0)]
+    weights = [0.8, 0.2]
+    ratios = np.geomspace(150.0, 800.0, 15)
+    alone = [optimize(load, motor, MID_LIMITS, ratios=ratios) for load in loads]
+    assert not evaluate_design(loads[1], Design(alone[0]["stiffness"], alone[0]["ratio"]), motor,
+                               MID_LIMITS)["drive_feasible"]
+    mix = optimize_mix(loads, weights, motor, MID_LIMITS, ratios=ratios)
+    alphas = np.linspace(0.0, 0.03, 3001)
+    best = np.inf
+    for n in ratios:
+        results = [evaluate(load, alphas, np.full_like(alphas, n), motor, MID_LIMITS) for load in loads]
+        ok = results[0]["drive_feasible"] & results[1]["drive_feasible"]
+        total = weights[0] * results[0]["energy"] + weights[1] * results[1]["energy"]
+        best = min(best, float(np.where(ok, total, np.inf).min()))
+    assert mix["weighted_energy"] <= best * (1 + 1e-9)
+    assert mix["weighted_energy"] == pytest.approx(best, rel=1e-3)
+    for load in loads:
+        assert evaluate_design(load, Design(mix["stiffness"], mix["ratio"]), motor, MID_LIMITS)["drive_feasible"]
