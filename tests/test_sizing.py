@@ -194,3 +194,23 @@ def test_mix_matches_brute_force_and_is_feasible_in_every_activity(motor) -> Non
     assert mix["weighted_energy"] == pytest.approx(best, rel=1e-3)
     for load in loads:
         assert evaluate_design(load, Design(mix["stiffness"], mix["ratio"]), motor, MID_LIMITS)["drive_feasible"]
+
+
+def test_mix_conditions_pick_the_source_geometry() -> None:
+    from types import SimpleNamespace
+
+    from anklesea.sizing import mix_conditions
+
+    profiles = {("treadmill", "1.20 m/s"): SimpleNamespace(n_subjects=10)}
+    for activity in ("rampascent", "rampdescent"):
+        for cond, n in [("5.2 deg", 9), ("7.8 deg", 9), ("18.0 deg", 9), ("4.0 deg", 1)]:
+            profiles[(activity, cond)] = SimpleNamespace(n_subjects=n)
+    for activity in ("stairascent", "stairdescent"):
+        for cond, n in [("4 in", 8), ("6 in", 8), ("7 in", 7), ("8 in", 2)]:
+            profiles[(activity, cond)] = SimpleNamespace(n_subjects=n)
+    picked = mix_conditions(profiles)
+    assert picked["rampascent"] == ("rampascent", "5.2 deg") and picked["stairdescent"] == ("stairdescent", "7 in")
+    low = mix_conditions(profiles, stair="lowest", ramp="lowest")
+    assert low["rampdescent"][1] == "5.2 deg" and low["stairascent"][1] == "4 in"
+    high = mix_conditions(profiles, stair="highest", ramp="highest")
+    assert high["rampascent"][1] == "18.0 deg" and high["stairascent"][1] == "7 in"

@@ -11,8 +11,6 @@ Data: Camargo et al. (2021), J. Biomech. 119:110320, CC BY 4.0.
 
 from __future__ import annotations
 
-import re
-
 import matplotlib
 
 matplotlib.use("Agg")
@@ -22,14 +20,16 @@ import numpy as np
 from anklesea import RESULTS_DIR
 from anklesea.motor import default_motor
 from anklesea.plots import ACTIVITY_COLORS, ACTIVITY_NAMES, add_citation
-from anklesea.profiles import GaitProfile, read_profiles
+from anklesea.profiles import read_profiles
 from anklesea.sea import Design, Limits, evaluate_design
 from anklesea.sizing import (
     BUS_VOLTAGE,
     DAILY_MIX,
     DESIGN_MASS_KG,
     LEVEL_WALK,
+    MIX_ACTIVITIES,
     STEPS_PER_DAY,
+    mix_conditions,
     optimize,
     optimize_mix,
     sweep,
@@ -37,43 +37,11 @@ from anklesea.sizing import (
 
 REPORT = RESULTS_DIR / "cross_mode.md"
 FIGURE = RESULTS_DIR / "figures" / "cross_mode.png"
-ACTIVITIES = ["level", "rampascent", "rampdescent", "stairascent", "stairdescent"]
+ACTIVITIES = MIX_ACTIVITIES
 NAMES = {"level": "level walking", **{a: ACTIVITY_NAMES[a] for a in ACTIVITIES[1:]}}
 COLORS = {"level": ACTIVITY_COLORS["treadmill"], **{a: ACTIVITY_COLORS[a] for a in ACTIVITIES[1:]}}
-SOURCE_RAMP_DEG = 5.0  # ramp gradient of the course in Srisuwan and Klute (2021)
-SOURCE_STAIR_IN = 18.0 / 2.54  # 18 cm stair rise in the same course
 STRIDES_PER_DAY = STEPS_PER_DAY / 2  # one prosthesis stride per two steps
 J_PER_WH = 3600.0
-
-
-def number(condition: str) -> float:
-    return float(re.match(r"([\d.]+)", condition).group(1))
-
-
-def pick_conditions(profiles: dict[tuple[str, str], GaitProfile], level: tuple[str, str] = LEVEL_WALK,
-                    stair: str = "source", ramp: str = "source") -> dict[str, tuple[str, str]]:
-    """Condition standing in for each activity.
-
-    Ramps and stairs: the incline or step height closest to the course in the mix source,
-    among conditions with at least half as many subjects as the best-covered one (and at
-    least two when available). ``"lowest"`` or ``"highest"`` pick the extremes instead.
-    """
-    out = {"level": level}
-    for activity, target, choice in [("rampascent", SOURCE_RAMP_DEG, ramp), ("rampdescent", SOURCE_RAMP_DEG, ramp),
-                                     ("stairascent", SOURCE_STAIR_IN, stair),
-                                     ("stairdescent", SOURCE_STAIR_IN, stair)]:
-        cands = [(c, p.n_subjects) for (a, c), p in profiles.items() if a == activity]
-        top = max(n for _, n in cands)
-        floor = min(top, max(2, int(np.ceil(top / 2))))
-        cands = [c for c, n in cands if n >= floor]
-        if choice == "lowest":
-            pick = min(cands, key=number)
-        elif choice == "highest":
-            pick = max(cands, key=number)
-        else:
-            pick = min(cands, key=lambda c: abs(number(c) - target))
-        out[activity] = (activity, pick)
-    return out
 
 
 def run_case(profiles, conditions, weights, motor, limits: Limits, objective: str = "energy") -> dict:
@@ -109,7 +77,7 @@ def main() -> int:
     profiles = read_profiles()
     motor = default_motor()
     limits = Limits.from_motor(motor, BUS_VOLTAGE)
-    conditions = pick_conditions(profiles)
+    conditions = mix_conditions(profiles)
     loads = {a: profiles[conditions[a]].load(DESIGN_MASS_KG) for a in ACTIVITIES}
 
     own = {a: optimize(loads[a], motor, limits) for a in ACTIVITIES}
@@ -158,9 +126,9 @@ def main() -> int:
         ("objective: energy without regeneration (grid search)", conditions, DAILY_MIX, "energy_no_regen", limits),
         ("level walking at 1.0 m/s", {**conditions, "level": ("treadmill", "1.00 m/s")}, DAILY_MIX, "energy", limits),
         ("level walking at 1.4 m/s", {**conditions, "level": ("treadmill", "1.40 m/s")}, DAILY_MIX, "energy", limits),
-        ("lowest ramp and stair conditions", pick_conditions(profiles, stair="lowest", ramp="lowest"), DAILY_MIX,
+        ("lowest ramp and stair conditions", mix_conditions(profiles, stair="lowest", ramp="lowest"), DAILY_MIX,
          "energy", limits),
-        ("highest ramp and stair conditions", pick_conditions(profiles, stair="highest", ramp="highest"), DAILY_MIX,
+        ("highest ramp and stair conditions", mix_conditions(profiles, stair="highest", ramp="highest"), DAILY_MIX,
          "energy", limits),
         ("bus voltage 48 V (limits checked at 48 V)", conditions, DAILY_MIX, "energy", Limits.from_motor(motor, 48.0)),
     ]

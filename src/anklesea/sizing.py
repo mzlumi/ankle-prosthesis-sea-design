@@ -25,6 +25,7 @@ Two ways to find the optimum:
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 import numpy as np
@@ -42,6 +43,9 @@ LEVEL_WALK = ("treadmill", "1.20 m/s")
 DAILY_MIX = {"level": 0.828 + 0.090, "rampascent": 0.016, "rampdescent": 0.020, "stairascent": 0.023,
              "stairdescent": 0.025}
 STEPS_PER_DAY = 4422  # same source, mean over 1 to 2 weekdays
+MIX_ACTIVITIES = ["level", "rampascent", "rampdescent", "stairascent", "stairdescent"]
+SOURCE_RAMP_DEG = 5.0  # ramp gradient of the course in the same source
+SOURCE_STAIR_IN = 18.0 / 2.54  # 18 cm stair rise in the same course
 
 
 @dataclass
@@ -324,3 +328,34 @@ def optimize_mix(
         return {"stiffness": np.nan, "ratio": np.nan, "compliance": np.nan, "weighted_energy": np.nan}
     return {"stiffness": np.inf if alpha == 0.0 else 1.0 / alpha, "ratio": float(n), "compliance": alpha,
             "weighted_energy": energy}
+
+
+def _condition_number(condition: str) -> float:
+    return float(re.match(r"([\d.]+)", condition).group(1))
+
+
+def mix_conditions(
+    profiles: dict, level: tuple[str, str] = LEVEL_WALK, stair: str = "source", ramp: str = "source"
+) -> dict[str, tuple[str, str]]:
+    """Dataset condition standing in for each activity of :data:`DAILY_MIX`.
+
+    Ramps and stairs: the incline or step height closest to the course in the mix source,
+    among conditions with at least half as many subjects as the best-covered one (and at
+    least two when available). ``"lowest"`` or ``"highest"`` pick the extremes instead.
+    """
+    out = {"level": level}
+    for activity, target, choice in [("rampascent", SOURCE_RAMP_DEG, ramp), ("rampdescent", SOURCE_RAMP_DEG, ramp),
+                                     ("stairascent", SOURCE_STAIR_IN, stair),
+                                     ("stairdescent", SOURCE_STAIR_IN, stair)]:
+        cands = [(c, p.n_subjects) for (a, c), p in profiles.items() if a == activity]
+        top = max(n for _, n in cands)
+        floor = min(top, max(2, int(np.ceil(top / 2))))
+        cands = [c for c, n in cands if n >= floor]
+        if choice == "lowest":
+            pick = min(cands, key=_condition_number)
+        elif choice == "highest":
+            pick = max(cands, key=_condition_number)
+        else:
+            pick = min(cands, key=lambda c: abs(_condition_number(c) - target))
+        out[activity] = (activity, pick)
+    return out

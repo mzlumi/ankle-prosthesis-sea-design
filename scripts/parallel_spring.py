@@ -23,7 +23,7 @@ from anklesea.parallel import ParallelSpring, actuator_load, joint_level_spring,
 from anklesea.plots import add_citation
 from anklesea.profiles import read_profiles
 from anklesea.sea import Limits, evaluate, motor_trajectory
-from anklesea.sizing import BUS_VOLTAGE, DESIGN_MASS_KG, LEVEL_WALK, optimize
+from anklesea.sizing import BUS_VOLTAGE, DESIGN_MASS_KG, LEVEL_WALK, mix_conditions, optimize
 
 REPORT = RESULTS_DIR / "parallel_spring.md"
 FIGURE = RESULTS_DIR / "figures" / "parallel_spring.png"
@@ -39,8 +39,6 @@ def check(load, design: dict, motor, limits) -> dict:
 
 
 def main() -> int:
-    from cross_mode import pick_conditions  # same activity conditions as section 10
-
     profiles = read_profiles()
     motor = default_motor()
     limits = Limits.from_motor(motor, BUS_VOLTAGE)
@@ -88,7 +86,7 @@ def main() -> int:
                       + [row(n, d) for n, d in designs])
 
     # The walking-tuned designs in the other activities.
-    conditions = pick_conditions(profiles)
+    conditions = mix_conditions(profiles)
     act_rows = []
     rms_by_activity = {"level": (sea["rms_current"], rms["rms_current"])}
     for a in OTHER:
