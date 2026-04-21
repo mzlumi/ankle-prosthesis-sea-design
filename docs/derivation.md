@@ -106,4 +106,20 @@ The search over the ratio $N$ remains one-dimensional and is done by scanning. `
 
 ## 9. Parallel spring
 
-A spring in parallel with the actuator, $\tau_p = -k_p(\theta - \theta_0)$, carries part of the joint torque, so the actuator (series spring and motor) supplies $\tau_a = \tau - \tau_p = \tau + k_p\theta - k_p\theta_0$. Writing $\tau_0 = k_p\theta_0$, the actuator torque is affine in the two parallel-spring parameters $(k_p, \tau_0)$, and so are the motor torque and speed for a fixed series compliance and ratio. The RMS motor torque is then a convex quadratic in $(k_p, \tau_0)$, and its minimizer is a 2-by-2 linear solve (L12 and L13). Section 11 of the study uses this to reduce the RMS current, which a series spring cannot do.
+A spring in parallel with the actuator, $\tau_p = -k_p(\theta - \theta_0)$, carries part of the joint torque, so the actuator (series spring and motor) supplies
+
+$$\tau_a = \tau - \tau_p = \tau + k_p\theta - \tau_0, \qquad \tau_0 = k_p\theta_0.$$
+
+The actuator torque and its derivatives are affine in $x = (k_p, \tau_0)$, so for a fixed series compliance $\alpha$ and ratio $N$ the motor torque and speed are affine too: $\tau_m = u_0 + U x$, $\omega_m = v_0 + V x$. Only $k_p$ enters the speed, through $\dot\tau_a = \dot\tau + k_p\dot\theta$.
+
+**Mean squared current.** $\int \tau_m^2\,dt = x^\top\!\left(\int U^\top U\right)x + 2x^\top\!\int U^\top u_0 + \dots$ is a convex quadratic, minimized by a 2-by-2 linear solve.
+
+**Energy.** The quadratic part of $\int \tau_m\omega_m\,dt$ comes from the $k_p$ terms only:
+
+$$k_p^2\int_0^T \left(JN\alpha\ddot\theta + bN\alpha\dot\theta + \frac{\theta}{N\eta}\right)N\alpha\dot\theta\,dt = k_p^2\,bN^2\alpha^2\int_0^T\dot\theta^2dt \ge 0,$$
+
+because $\int\ddot\theta\dot\theta$ and $\int\theta\dot\theta$ vanish over a closed cycle (and the $\tau_0$ cross term is a multiple of $\int\dot\theta = 0$). With the copper term, the energy is a convex quadratic in $x$ as well.
+
+**Rigid series path.** At $\alpha = 0$ the motor speed $N\dot\theta$ does not depend on $x$, and the linear term $\int (Ux)\,N\dot\theta\,dt$ is a combination of $\int\theta\dot\theta$ and $\int\dot\theta$, both zero. The energy then differs from the copper loss only by a constant, so the least-energy and least-RMS-current parallel springs coincide.
+
+**Joint design.** The energy is convex in $\alpha$ for fixed $x$ and convex in $x$ for fixed $\alpha$, but not jointly. `anklesea.parallel.optimize_parallel` therefore alternates the two closed-form steps at each ratio, and `results/parallel_spring.md` checks the result against a brute-force grid over $x$.
