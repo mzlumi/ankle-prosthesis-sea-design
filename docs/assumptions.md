@@ -40,3 +40,10 @@ Every assumption that changes a result, with its source or the reason for the va
 | Assumption | Value | Source or reason | Varied in |
 |---|---|---|---|
 | Parallel spring law | linear, `tau_p = -k_p (theta - theta_0)`, acting in stance and swing | Keeps the design problem convex in the spring parameters (L12, L13). Real designs often engage the spring only in stance (clutch or unidirectional spring), which this model cannot represent. | Not varied; discussed in `results/parallel_spring.md` |
+
+## Control
+
+| Assumption | Value | Source or reason | Varied in |
+|---|---|---|---|
+| Inertia of the foot below the series spring | 0.01 kg m² about the ankle | Assumption for a prosthetic foot and shoe of roughly 1 kg with its centre of mass a few centimetres from the joint. It only matters with the foot in the air (free-output plant). | Not varied; the fixed-output plant, which governs stance, does not depend on it |
+| Controlled designs | the walking-tuned and compromise designs of `results/cross_mode.md` | The compromise meets the drive limits in every activity; the walking-tuned design is the energy optimum for level walking. | Both carried through sections 12 to 16 |
