@@ -8,7 +8,7 @@ import matio
 import numpy as np
 import pandas as pd
 
-from anklesea.profiles import Load
+from anklesea.profiles import GaitProfile, Load
 
 FS = 200.0
 
@@ -104,6 +104,13 @@ def write_subject_info(raw_dir: Path, masses: dict[str, float]) -> None:
         }
     )
     matio.save_to_mat(str(raw_dir / "SubjectInfo.mat"), {"data": table}, version="v7")
+
+
+def synthetic_profile(mass: float = 1.0, stride_time: float = 1.1) -> GaitProfile:
+    """A gait profile (per kg of ``mass``) from :func:`synthetic_ankle` on 0 to 100 % of the cycle."""
+    pct = np.linspace(0.0, 100.0, 101)
+    angle_deg, moment = synthetic_ankle(pct, mass)
+    return GaitProfile("synthetic", "test", pct, np.radians(angle_deg), moment / mass, stride_time, 1, 1)
 
 
 PERIOD = 1.2

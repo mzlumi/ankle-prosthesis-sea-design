@@ -38,8 +38,8 @@ from anklesea.sizing import (
 REPORT = RESULTS_DIR / "cross_mode.md"
 FIGURE = RESULTS_DIR / "figures" / "cross_mode.png"
 ACTIVITIES = MIX_ACTIVITIES
-NAMES = {"level": "level walking", **{a: ACTIVITY_NAMES[a] for a in ACTIVITIES[1:]}}
-COLORS = {"level": ACTIVITY_COLORS["treadmill"], **{a: ACTIVITY_COLORS[a] for a in ACTIVITIES[1:]}}
+NAMES = ACTIVITY_NAMES
+COLORS = ACTIVITY_COLORS
 STRIDES_PER_DAY = STEPS_PER_DAY / 2  # one prosthesis stride per two steps
 J_PER_WH = 3600.0
 

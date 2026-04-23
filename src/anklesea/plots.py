@@ -20,8 +20,10 @@ ACTIVITY_COLORS = {
     "rampdescent": "#ff9896",
     "stairascent": "#2ca02c",
     "stairdescent": "#98df8a",
+    "level": "#1f77b4",  # level walking in the daily mix
 }
 ACTIVITY_NAMES = {
+    "level": "level walking",
     "treadmill": "treadmill",
     "levelground": "level ground",
     "rampascent": "ramp ascent",
