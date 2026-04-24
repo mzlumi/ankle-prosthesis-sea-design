@@ -17,27 +17,30 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from anklesea import RESULTS_DIR
-from anklesea.designs import default_setup, reference_designs
-from anklesea.plant import SEAParams, free_output
+from anklesea.designs import (
+    CONTROL_RATE_HZ,
+    INTEGRAL_FRACTION,
+    LOOP_DELAY,
+    PLACEMENT_HZ,
+    TARGET_BANDWIDTH_HZ,
+    TARGET_GM_DB,
+    TARGET_MS,
+    TARGET_PM_DEG,
+    TARGET_TRACKING_PCT,
+    default_setup,
+    reference_designs,
+)
+from anklesea.plant import SEAParams
 from anklesea.plots import ACTIVITY_NAMES, CITATION, add_citation
 from anklesea.profiles import fourier_coefficients, read_profiles
 from anklesea.sizing import DESIGN_MASS_KG, MIX_ACTIVITIES, mix_conditions
-from anklesea.torque_control import FEEDFORWARDS, loop_metrics, periodic_tracking, pid_loop, tune_pid
+from anklesea.torque_control import FEEDFORWARDS, Controller, loop_metrics, periodic_tracking, pid_loop, tune_pid
 
 REPORT = RESULTS_DIR / "torque_pid.md"
 FIGURE = RESULTS_DIR / "figures" / "torque_pid.png"
 HZ = 2 * np.pi
 
-CONTROL_RATE_HZ = 1000.0
-LOOP_DELAY = 1.5 / CONTROL_RATE_HZ  # one sample of computation plus half a sample of zero-order hold
-PLACEMENT_HZ = 8.0
-INTEGRAL_FRACTION = 0.2
 FIRST_TRY = (6.0, 0.1)  # placement and integral fraction of the first tuning, kept for the comparison
-TARGET_BANDWIDTH_HZ = 6.0
-TARGET_PM_DEG = 45.0
-TARGET_GM_DB = 10.0
-TARGET_MS = 2.0
-TARGET_TRACKING_PCT = 5.0
 STYLES = {"compromise": ("#b45309", "-"), "walking": ("#1d4ed8", "--")}
 FF_STYLES = {"none": ("#6b7280", ":"), "static": ("#1d4ed8", "--"), "model": ("#b45309", "-")}
 FF_NAMES = {"none": "feedback only", "static": "feedback + static feedforward",
@@ -71,7 +74,7 @@ def main() -> int:
     for name, p in params.items():
         gains[name] = tune_pid(p, PLACEMENT_HZ, integral_fraction=INTEGRAL_FRACTION)
         stance[name] = loop_metrics(pid_loop(p, gains[name], w, LOOP_DELAY), w)
-        swing[name] = loop_metrics(pid_loop(p, gains[name], w, LOOP_DELAY, plant=free_output(p)), w)
+        swing[name] = loop_metrics(pid_loop(p, gains[name], w, LOOP_DELAY, output="free"), w)
 
     def ok(flag: bool) -> str:
         return "yes" if flag else "**no**"
@@ -100,7 +103,7 @@ def main() -> int:
             m = loop_metrics(loop, w)
             s_stride = np.abs(1 / (1 + loop[np.argmin(np.abs(w - HZ * stride_hz))]))
             t_dip = 20 * np.log10(np.abs(loop / (1 + loop))[w <= HZ * TARGET_BANDWIDTH_HZ].min())
-            err = max(periodic_tracking(profiles[conditions[a]], DESIGN_MASS_KG, g, p, "none", delay=LOOP_DELAY)
+            err = max(periodic_tracking(profiles[conditions[a]], DESIGN_MASS_KG, Controller(p, g, "none"), delay=LOOP_DELAY)
                       .rms_error_pct() for a in MIX_ACTIVITIES)
             first_none_err[(name, label)] = err
             first_rows.append(f"| {name} | {label} | {placement:.0f} | {fraction:.1f} | {m.bandwidth_hz:.1f} | "
@@ -113,7 +116,7 @@ def main() -> int:
         cells = []
         for name in ["compromise", "walking"]:
             for ff in FEEDFORWARDS:
-                tr = periodic_tracking(gp, DESIGN_MASS_KG, gains[name], params[name], ff, delay=LOOP_DELAY)
+                tr = periodic_tracking(gp, DESIGN_MASS_KG, Controller(params[name], gains[name], ff), delay=LOOP_DELAY)
                 tracking[(activity, name, ff)] = tr
                 cells.append(f"{tr.rms_error_pct():.2f} / {tr.peak_error_pct():.1f}")
         track_rows.append(f"| {ACTIVITY_NAMES[activity]} ({conditions[activity][1]}) | " + " | ".join(cells) + " |")
@@ -129,7 +132,7 @@ def main() -> int:
                             label=f"{name}: bandwidth {stance[name].bandwidth_hz:.1f} Hz")
         axes[0, 1].semilogx(f, 20 * np.log10(np.abs(1 / (1 + loop))), color=color, ls=ls, lw=1.8,
                             label=f"{name}, stance")
-        loop_sw = pid_loop(p, gains[name], w, LOOP_DELAY, plant=free_output(p))
+        loop_sw = pid_loop(p, gains[name], w, LOOP_DELAY, output="free")
         axes[0, 1].semilogx(f, 20 * np.log10(np.abs(1 / (1 + loop_sw))), color=color, ls=ls, lw=0.9, alpha=0.6,
                             label=f"{name}, swing")
     axes[0, 0].axhline(-3, color="0.5", lw=0.8)
@@ -169,8 +172,8 @@ def main() -> int:
     worst_static = max(tracking[(a, "compromise", "static")].rms_error_pct() for a in MIX_ACTIVITIES)
     level = profiles[conditions["level"]]
     none_level = tracking[("level", "compromise", "none")].rms_error_pct()
-    still = periodic_tracking(replace(level, angle=np.zeros_like(level.angle)), DESIGN_MASS_KG, gains["compromise"],
-                              params["compromise"], "none", delay=LOOP_DELAY).rms_error_pct()
+    still = periodic_tracking(replace(level, angle=np.zeros_like(level.angle)), DESIGN_MASS_KG,
+                              Controller(params["compromise"], gains["compromise"], "none"), delay=LOOP_DELAY).rms_error_pct()
     text = f"""# Torque control: PID with model-based feedforward
 
 Controller for the spring torque of the two reference designs (`anklesea.torque_control`), designed on the linear plant of `results/plant.md`. The controller runs at {CONTROL_RATE_HZ:.0f} Hz; its delay (one sample of computation plus half a sample of zero-order hold, {LOOP_DELAY * 1e3:.1f} ms) is included in every margin and tracking result. The motor's current loop is assumed ideal here and is modeled, with saturation, in `results/tracking.md`.
