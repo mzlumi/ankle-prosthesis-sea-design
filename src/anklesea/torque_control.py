@@ -365,3 +365,34 @@ def dob_cutoff(
 def pid_loop(p: SEAParams, gains: PIDGains, w: np.ndarray, delay: float = 0.0, output: str = "fixed") -> np.ndarray:
     """Loop frequency response ``C(jw) P(jw) e^{-jw delay}`` of a PID controller alone."""
     return Controller(p, gains, "none").closed_loop(w, None, output, delay).loop
+
+
+@dataclass(frozen=True)
+class Environment:
+    """A passive joint load: ``J_e theta_ddot + b_e theta_dot + k_e theta = tau_s``."""
+
+    inertia: float  # kg m^2
+    damping: float  # N·m·s/rad
+    stiffness: float  # N·m/rad
+
+    def impedance_poly(self, jw: np.ndarray) -> np.ndarray:
+        return self.inertia * jw**2 + self.damping * jw + self.stiffness
+
+
+def coupled_stable(torque_per_angle, env: Environment, w: np.ndarray | None = None) -> bool:
+    """Nyquist test of the actuator coupled to ``env`` instead of a prescribed joint motion.
+
+    ``torque_per_angle(w)`` is the actuator's spring torque per joint angle with zero
+    reference (stable on its own). The joint obeys ``E(s) theta = tau_s`` with
+    ``E = J_e s^2 + b_e s + k_e``, so the coupled characteristic equation is
+    ``1 + L = 0`` with ``L = -H_theta / E``. Both factors of ``L`` are stable (``b_e > 0``),
+    so the coupled system is stable if and only if ``1 + L(jw)`` does not wind around the
+    origin; for a real system the winding over all frequencies is twice that over
+    ``w >= 0``.
+    """
+    if w is None:
+        w = np.concatenate([[1e-6], np.logspace(-3, 6, 400000)])
+    one_plus_l = 1 - torque_per_angle(w) / env.impedance_poly(1j * w)
+    phase = np.unwrap(np.angle(one_plus_l))
+    winding = 2 * (phase[-1] - phase[0]) / (2 * np.pi)
+    return bool(abs(winding) < 0.5)

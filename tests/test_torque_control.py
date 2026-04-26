@@ -11,6 +11,8 @@ from anklesea.profiles import fourier_coefficients, fourier_eval
 from anklesea.sea import Design
 from anklesea.torque_control import (
     Controller,
+    Environment,
+    coupled_stable,
     PIDGains,
     loop_metrics,
     periodic_tracking,
@@ -171,3 +173,25 @@ def test_integral_action_breaks_passivity_and_pd_keeps_it(params) -> None:
     assert np.all(np.real(pd) >= 0)
     assert np.real(pid).min() < 0
     assert np.real(dob).min() < 0
+
+
+def test_coupled_stability_of_a_negative_spring() -> None:
+    # An "actuator" that pushes the joint away, tau_s = +K theta, against an environment of
+    # stiffness k_e: stable only if k_e > K.
+    def negative_spring(w: np.ndarray) -> np.ndarray:
+        return np.full(w.shape, 100.0, dtype=complex)
+
+    assert coupled_stable(negative_spring, Environment(0.5, 2.0, 150.0))
+    assert not coupled_stable(negative_spring, Environment(0.5, 2.0, 50.0))
+
+
+def test_a_passive_actuator_is_stable_with_every_passive_environment(params) -> None:
+    pd = Controller(params, pd_gains(params), "none")
+
+    def h(w: np.ndarray) -> np.ndarray:
+        return pd.closed_loop(w).torque_per_angle
+
+    w = np.concatenate([[1e-6], np.logspace(-3, 5, 100000)])
+    for inertia in [0.01, 1.0, 100.0]:
+        for stiffness in [0.0, 100.0, 1e4]:
+            assert coupled_stable(h, Environment(inertia, 0.1, stiffness), w)
