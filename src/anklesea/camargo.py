@@ -68,11 +68,16 @@ class TrialName:
 
 
 def parse_trial_name(stem: str) -> TrialName:
-    """Parse a trial file stem (without ``.mat``) into its parts."""
+    """Parse a trial file stem (without ``.mat``) into its parts.
+
+    Some subjects' files are capitalized (``Ramp_1_L_01_04``); the parts are parsed in
+    lower case and ``stem`` keeps the original spelling, which the file path needs.
+    """
     stem = Path(stem).stem
-    mode = stem.split("_", 1)[0]
+    lower = stem.lower()
+    mode = lower.split("_", 1)[0]
     pattern = _NAME_PATTERNS.get(mode)
-    match = pattern.match(stem) if pattern else None
+    match = pattern.match(lower) if pattern else None
     if match is None:
         raise ValueError(f"not a Camargo trial name: {stem!r}")
     parts = match.groupdict()

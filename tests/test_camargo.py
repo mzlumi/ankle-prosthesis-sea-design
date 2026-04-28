@@ -17,6 +17,8 @@ from anklesea import camargo
         ("ramp_6_r_01_02", "ramp", "6", "r", None, 1, 2),
         ("stair_2_l_02_03", "stair", "2", "l", None, 2, 3),
         ("treadmill_04_2_01", "treadmill", "", None, None, 4, 1),
+        ("LevelGround_ccw_normal_01_02", "levelground", "normal", None, "ccw", 1, 2),
+        ("Ramp_1_L_01_04", "ramp", "1", "l", None, 1, 4),
     ],
 )
 def test_parse_trial_name(stem, mode, condition, leg, turn, block, index) -> None:
@@ -29,6 +31,10 @@ def test_parse_trial_name(stem, mode, condition, leg, turn, block, index) -> Non
         block,
         index,
     )
+
+
+def test_parse_keeps_the_original_spelling_of_the_stem() -> None:
+    assert camargo.parse_trial_name("Stair_2_R_01_03.mat").stem == "Stair_2_R_01_03"
 
 
 def test_parse_repeated_trial() -> None:
