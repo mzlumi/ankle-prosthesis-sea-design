@@ -23,7 +23,7 @@ for the reference torque. It cancels both the plant's own dynamics and the joint
 which the feedback alone would see as a disturbance; the feedback then only corrects
 model error.
 
-**Disturbance observer (DOB).** Following T. Paine, S. Oh and L. Sentis, "Design and
+**Disturbance observer (DOB).** Following N. Paine, S. Oh and L. Sentis, "Design and
 control considerations for high-performance series elastic actuators", IEEE/ASME
 Trans. Mechatronics 19(3):1080-1091, 2014: the nominal fixed-output model ``Pn``
 predicts the spring torque that the applied motor torque should produce; anything else

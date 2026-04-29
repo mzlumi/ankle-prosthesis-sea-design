@@ -1,6 +1,6 @@
 # Torque control: disturbance observer, and passivity
 
-A disturbance observer (DOB) after T. Paine, S. Oh and L. Sentis, "Design and control considerations for high-performance series elastic actuators", IEEE/ASME Trans. Mechatronics 19(3):1080-1091, 2014, implemented from that description in `anklesea.torque_control` and compared with the PID of `results/torque_pid.md`. The DOB uses the nominal fixed-output model `Pn`: whatever makes the measured spring torque differ from what `Pn` predicts for the command it sent is treated as a disturbance at the motor and cancelled below the cut-off of a second-order low-pass `Q`. Because `Q(0) = 1` it acts as integral action, so it is paired with the same PD gains as the PID, without the integral. Every result includes the 1.5 ms loop delay unless stated.
+A disturbance observer (DOB) after N. Paine, S. Oh and L. Sentis, "Design and control considerations for high-performance series elastic actuators", IEEE/ASME Trans. Mechatronics 19(3):1080-1091, 2014, implemented from that description in `anklesea.torque_control` and compared with the PID of `results/torque_pid.md`. The DOB uses the nominal fixed-output model `Pn`: whatever makes the measured spring torque differ from what `Pn` predicts for the command it sent is treated as a disturbance at the motor and cancelled below the cut-off of a second-order low-pass `Q`. Because `Q(0) = 1` it acts as integral action, so it is paired with the same PD gains as the PID, without the integral. Every result includes the 1.5 ms loop delay unless stated.
 
 ## Q-filter cut-off
 
