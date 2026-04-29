@@ -16,8 +16,8 @@ Level walking at 1.2 m/s, limits removed, exact joint derivatives. Each cell is 
 
 | design | energy per stride (J) | RMS current (A) | peak current (A) | RMS error (%) |
 |---|---|---|---|---|
-| walking | 29.70 / 29.57 | 6.94 / 6.93 | 12.5 / 12.5 | 0.039 / 0.093 |
-| compromise | 45.85 / 45.75 | 11.12 / 11.12 | 22.3 / 22.3 | 0.033 / 0.078 |
+| walking | 23.50 / 23.39 | 5.68 / 5.67 | 11.3 / 11.2 | 0.042 / 0.099 |
+| compromise | 24.76 / 24.67 | 6.39 / 6.38 | 12.4 / 12.3 | 0.038 / 0.090 |
 
 The energies and currents agree to within a percent, so the sizing results hold for a controlled actuator that tracks well. The tracking errors are both a fraction of a percent; they differ because the simulation's delay is a sample-and-hold, not a pure delay.
 
@@ -27,14 +27,14 @@ RMS and peak error in % of the peak reference torque; saturation as % of the str
 
 | condition | RMS error (%) | peak error (%) | voltage saturated (%) | current saturated (%) | peak current (A) | RMS current (A) | peak voltage (V) | energy (J/stride) | RMS error within 5 % |
 |---|---|---|---|---|---|---|---|---|---|
-| treadmill 1.20 m/s | 0.41 | 1.1 | 0.0 | 0.0 | 22.3 | 11.1 | 28.8 | 46.7 | yes |
-| treadmill 2.05 m/s | 5.67 | 19.6 | 24.0 | 10.8 | 22.5 | 9.9 | 34.2 | 69.8 | **no** |
-| ramp ascent 5.2 deg | 0.40 | 1.4 | 0.0 | 0.0 | 16.3 | 7.5 | 16.9 | 37.9 | yes |
-| ramp ascent 9.2 deg | 1.59 | 9.6 | 3.8 | 0.0 | 24.7 | 8.4 | 34.2 | 49.3 | yes |
-| ramp descent 5.2 deg | 0.47 | 1.6 | 3.1 | 0.0 | 21.6 | 10.7 | 34.2 | -4.4 | yes |
-| ramp descent 9.2 deg | 2.56 | 11.4 | 9.5 | 1.6 | 25.0 | 12.8 | 34.2 | 6.6 | yes |
-| stair ascent 6 in | 0.20 | 0.7 | 0.0 | 0.0 | 13.5 | 6.4 | 23.2 | 45.7 | yes |
-| stair descent 6 in | 0.56 | 2.9 | 0.0 | 0.0 | 19.9 | 10.1 | 29.7 | -27.2 | yes |
+| treadmill 1.20 m/s | 0.60 | 1.6 | 0.0 | 0.0 | 12.4 | 6.5 | 27.5 | 26.0 | yes |
+| treadmill 1.85 m/s | 3.29 | 11.5 | 24.9 | 3.9 | 14.1 | 6.4 | 34.2 | 53.6 | yes |
+| ramp ascent 5.2 deg | 0.37 | 1.1 | 0.0 | 0.0 | 13.6 | 6.2 | 28.2 | 42.4 | yes |
+| ramp ascent 7.8 deg | 0.47 | 1.8 | 0.0 | 0.0 | 16.9 | 7.4 | 32.3 | 47.0 | yes |
+| ramp descent 5.2 deg | 0.67 | 2.2 | 2.5 | 0.0 | 14.1 | 5.9 | 34.2 | 1.4 | yes |
+| ramp descent 9.2 deg | 1.51 | 8.7 | 3.8 | 0.0 | 23.2 | 5.9 | 34.2 | -5.1 | yes |
+| stair ascent 6 in | 0.21 | 0.6 | 0.0 | 0.0 | 10.6 | 5.4 | 27.3 | 51.5 | yes |
+| stair descent 6 in | 0.56 | 1.7 | 0.0 | 0.0 | 13.4 | 5.5 | 33.2 | -32.8 | yes |
 
 ## Both designs and both controllers
 
@@ -42,14 +42,14 @@ RMS error in % of peak torque, with the share of the stride spent at the voltage
 
 | condition | compromise, PID | compromise, DOB | walking-tuned, PID | walking-tuned, DOB |
 |---|---|---|---|---|
-| treadmill 1.20 m/s | 0.41 (0 %) | 0.35 (0 %) | 0.59 (8 %) | 0.47 (7 %) |
-| treadmill 2.05 m/s | 5.67 (24 %) | 5.58 (27 %) | 8.96 (44 %) | 8.57 (43 %) |
-| ramp ascent 5.2 deg | 0.40 (0 %) | 0.35 (0 %) | 0.60 (0 %) | 0.52 (0 %) |
-| ramp ascent 9.2 deg | 1.59 (4 %) | 1.57 (4 %) | 5.56 (21 %) | 5.54 (20 %) |
-| ramp descent 5.2 deg | 0.47 (3 %) | 0.43 (3 %) | 2.40 (8 %) | 2.37 (8 %) |
-| ramp descent 9.2 deg | 2.56 (10 %) | 2.55 (10 %) | 5.24 (12 %) | 5.23 (12 %) |
-| stair ascent 6 in | 0.20 (0 %) | 0.19 (0 %) | 1.39 (9 %) | 1.42 (9 %) |
-| stair descent 6 in | 0.56 (0 %) | 0.53 (0 %) | 0.88 (2 %) | 0.82 (2 %) |
+| treadmill 1.20 m/s | 0.60 (0 %) | 0.50 (0 %) | 0.69 (0 %) | 0.58 (2 %) |
+| treadmill 1.85 m/s | 3.29 (25 %) | 3.16 (24 %) | 5.50 (35 %) | 5.22 (34 %) |
+| ramp ascent 5.2 deg | 0.37 (0 %) | 0.31 (0 %) | 0.42 (0 %) | 0.35 (0 %) |
+| ramp ascent 7.8 deg | 0.47 (0 %) | 0.43 (0 %) | 0.53 (2 %) | 0.49 (3 %) |
+| ramp descent 5.2 deg | 0.67 (3 %) | 0.59 (2 %) | 0.89 (4 %) | 0.84 (5 %) |
+| ramp descent 9.2 deg | 1.51 (4 %) | 1.50 (4 %) | 2.50 (5 %) | 2.48 (5 %) |
+| stair ascent 6 in | 0.21 (0 %) | 0.18 (0 %) | 0.23 (0 %) | 0.21 (0 %) |
+| stair descent 6 in | 0.56 (0 %) | 0.51 (0 %) | 1.53 (14 %) | 1.53 (14 %) |
 
 ![Tracking](figures/tracking.png)
 
@@ -57,19 +57,19 @@ RMS error in % of peak torque, with the share of the stride spent at the voltage
 
 ## Reading the results
 
-- The compromise design tracks level walking with 0.41 % RMS error, most of it from estimating the joint acceleration with a filter (with exact derivatives it is a few hundredths of a percent, table above). It reaches a drive limit in treadmill 2.05 m/s, ramp ascent 9.2 deg, ramp descent 5.2 deg, ramp descent 9.2 deg. Its worst case is treadmill 2.05 m/s at 5.67 % RMS. The tracking target is missed in treadmill 2.05 m/s.
-- The walking-tuned design saturates in treadmill 1.20 m/s, treadmill 2.05 m/s, ramp ascent 9.2 deg, ramp descent 5.2 deg, ramp descent 9.2 deg, stair ascent 6 in, stair descent 6 in. This is the time-domain view of what the sizing found (`results/cross_mode.md`): its high ratio needs more voltage than the driver has when the motor must spin fast. While the voltage is saturated the current cannot follow its reference, and the torque error grows until the motor slows down again.
+- The compromise design tracks level walking with 0.60 % RMS error, most of it from estimating the joint acceleration with a filter (with exact derivatives it is a few hundredths of a percent, table above). It reaches a drive limit in treadmill 1.85 m/s, ramp descent 5.2 deg, ramp descent 9.2 deg. Its worst case is treadmill 1.85 m/s at 3.29 % RMS. Every condition meets the 5 % tracking target.
+- The walking-tuned design saturates in treadmill 1.85 m/s, ramp ascent 7.8 deg, ramp descent 5.2 deg, ramp descent 9.2 deg, stair descent 6 in. This is the time-domain view of what the sizing found (`results/cross_mode.md`): its high ratio needs more voltage than the driver has when the motor must spin fast. While the voltage is saturated the current cannot follow its reference, and the torque error grows until the motor slows down again.
 - The DOB and the PID perform alike here, as the linear comparison predicted: with model feedforward there is little left for either to correct.
 - Both designs are sized onto the voltage limit: the energy optimum of the walking-tuned design uses the full 34.2 V in level walking, and the compromise uses it in ramp descent (`results/cross_mode.md`). The inverse model needs exactly that voltage for perfect tracking, so any feedback correction or estimation error pushes the drive into saturation. A design for a real device should keep a voltage margin for control, for example by sizing against 85 to 90 % of the available voltage.
-- The RMS current in level walking (11.1 A) is above the motor's continuous rating (5.06 A) for both designs. Tracking does not change this; it is the thermal limit found in the sizing (`results/sizing_modes.md`) and addressed by the parallel spring (`results/parallel_spring.md`).
+- The RMS current in level walking (6.5 A) is above the motor's continuous rating (5.06 A) for both designs. Tracking does not change this; it is the thermal limit found in the sizing (`results/sizing_modes.md`) and addressed by the parallel spring (`results/parallel_spring.md`).
 
 ## What did not work first
 
-The first version of the simulation froze the PID integrator only when the current was clipped and fed the DOB the torque command it had computed. In treadmill 2.05 m/s, where the compromise design's drive is saturated for 24 % of the stride, that gave:
+The first version of the simulation froze the PID integrator only when the current was clipped and fed the DOB the torque command it had computed. In treadmill 2.05 m/s (2 subjects, a stress case beyond the conditions above), where the compromise design's drive is saturated for 47 % of the stride, that gave:
 
 | controller | RMS error, first version (%) | RMS error, final anti-windup (%) |
 |---|---|---|
-| PID | 5.79 | 5.67 |
-| DOB | 15.64 | 5.58 |
+| PID | 9.60 | 8.99 |
+| DOB | 57.61 | 8.84 |
 
 While the voltage is saturated, the current lags its reference; the DOB, comparing the measured torque with the *command*, sees the shortfall as a disturbance and adds it to the next command, which only deepens the saturation. Feeding the DOB the torque the motor actually produced (`k_t` times the measured current, which drives measure anyway) fixed the DOB. Freezing the PID integrator during voltage saturation as well helps the PID only a little, because its integrator is slow compared with a saturation episode.

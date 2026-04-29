@@ -4,8 +4,8 @@ Linear model of the actuator for torque control (`anklesea.plant`, python-contro
 
 | design | k (N·m/rad) | N | reflected inertia `eta J N^2` (kg m²) | reflected damping (N·m·s/rad) | DC gain `N eta` | fixed-output resonance (Hz) | free-output resonance (Hz) |
 |---|---|---|---|---|---|---|---|
-| walking | 294 | 771 | 1.41 | 2.36 | 540 | 2.30 | 27.4 |
-| compromise | 196 | 440 | 0.46 | 0.77 | 308 | 3.28 | 22.5 |
+| walking | 235 | 739 | 1.30 | 2.17 | 517 | 2.14 | 24.5 |
+| compromise | 205 | 603 | 0.87 | 1.45 | 422 | 2.45 | 22.9 |
 
 ![Bode plots](figures/plant_bode.png)
 
@@ -13,8 +13,8 @@ Linear model of the actuator for torque control (`anklesea.plant`, python-contro
 
 ## Reading the plots
 
-- **Fixed output.** A lightly damped second-order low-pass, `N eta k / (eta J N^2 s^2 + eta b N^2 s + k)`: the spring against the reflected rotor inertia. The resonance is low, 3.3 Hz for the compromise design and 2.3 Hz for the walking-tuned one, because the high ratio makes the reflected inertia large (0.46 kg m², about 46 times the foot's). The friction gives a damping ratio of only 0.040. The tests check the DC gain (`N eta`) and the resonance (`sqrt(k / (eta J N^2))`).
-- **Free output.** Zero DC gain (a free foot cannot hold a steady torque; the torque only accelerates it) and a resonance at `sqrt(k (1 / (eta J N^2) + 1 / J_L))` = 22.5 Hz, set by the light foot on the spring.
-- **Joint motion.** With the motor torque held, slow joint motion is followed by the rotor and does not change the spring torque; above the fixed-output resonance the rotor cannot follow and the joint motion deflects the spring fully (`-k theta`). In level walking, 53% of the joint-velocity power lies above the walking-tuned design's resonance and 30% above the compromise design's, so the controller must reject joint motion as a disturbance. This is why the feedforward of section 13 uses the measured joint motion.
+- **Fixed output.** A lightly damped second-order low-pass, `N eta k / (eta J N^2 s^2 + eta b N^2 s + k)`: the spring against the reflected rotor inertia. The resonance is low, 2.5 Hz for the compromise design and 2.1 Hz for the walking-tuned one, because the high ratio makes the reflected inertia large (0.87 kg m², about 87 times the foot's). The friction gives a damping ratio of only 0.054. The tests check the DC gain (`N eta`) and the resonance (`sqrt(k / (eta J N^2))`).
+- **Free output.** Zero DC gain (a free foot cannot hold a steady torque; the torque only accelerates it) and a resonance at `sqrt(k (1 / (eta J N^2) + 1 / J_L))` = 22.9 Hz, set by the light foot on the spring.
+- **Joint motion.** With the motor torque held, slow joint motion is followed by the rotor and does not change the spring torque; above the fixed-output resonance the rotor cannot follow and the joint motion deflects the spring fully (`-k theta`). In level walking, 56% of the joint-velocity power lies above the walking-tuned design's resonance and 56% above the compromise design's, so the controller must reject joint motion as a disturbance. This is why the feedforward of section 13 uses the measured joint motion.
 
 The low open-loop resonance is the price of the energy-optimal design: the same large reflected inertia that a spring decouples from the joint for efficiency makes the actuator slow to change its torque without feedback. The controller has to raise the torque bandwidth well above the open-loop resonance, which feedback can do only as far as the motor's voltage and current allow.

@@ -272,12 +272,32 @@ def main() -> None:
     climb_first = table[table["activity"].isin(climbs) & table["first"]]
     climb_share = 100 * len(climb_first) / max(len(table[table["activity"].isin(climbs)]), 1)
     climb_penalty = float((climb_first["err time, 0 ms"] - climb_first["err oracle"]).mean())
+    climb_later = table[table["activity"].isin(climbs) & ~table["first"]]
+    later_penalty = float((climb_later["err time, 0 ms"] - climb_later["err oracle"]).mean()) if len(climb_later) else float("nan")
+    later_text = (
+        f"The {len(climb_later)} later strides, predicted from a stride of the same activity, add {later_penalty:+.1f} points, "
+        "so the first stride of a segment is where a time-based estimator loses most."
+        if later_penalty < climb_penalty
+        else f"The {len(climb_later)} later strides add {later_penalty:+.1f} points, so a stride of the same activity is no "
+        "better a predictor here: the stride time keeps changing over a short flight of stairs or a short ramp."
+    )
+    later_text = (
+        f"The {len(climb_later)} later strides, predicted from a stride of the same activity, add {later_penalty:+.1f} points, "
+        "so the first stride of a segment is where a time-based estimator loses most."
+        if later_penalty < climb_penalty
+        else f"The {len(climb_later)} later strides add {later_penalty:+.1f} points, so a stride of the same activity is no "
+        "better a predictor here: the stride time keeps changing over a short flight of stairs or a short ramp."
+    )
+    per_subject = table.groupby(["activity", "condition", "subject"]).size()
+    over_names = [ACTIVITY_NAMES[a] for a in activities if a != "treadmill"]
+    over_median = float(per_subject.drop("treadmill", level="activity", errors="ignore").median())
+    tm_per_subject = float(per_subject.loc["treadmill"].median()) if "treadmill" in activities else float("nan")
+    over_gain = (e.loc["oracle"] - e.loc["oracle, own profile"]).drop(tm, errors="ignore")
+    estimator_cost = e.loc["time, 0 ms"] - e.loc["oracle"]
     tm_phase = {first: split.loc[("treadmill", first), "phase time, 0 ms"] for first in (False, True) if ("treadmill", first) in split.index}
     tracking = tracking_error_pct()
-    own_share = 100 * (1 - floor_own / generic)
-    own_gain = generic - floor_own
     small_text = (
-        f"{' and '.join(small).capitalize()} rest on fewer than {MIN_STRIDES} strides (only one or two right-leg stances per pass land on a force plate, `results/gait_profiles.md`), so their columns are noise at this sample size and the summary below leaves them out."
+        f"\n{' and '.join(small).capitalize()} rest on fewer than {MIN_STRIDES} strides (only one or two right-leg stances per pass land on a force plate, `results/gait_profiles.md`), so their columns are noise at this sample size and the summary below leaves them out."
         if small else ""
     )
 
@@ -314,10 +334,9 @@ A stride is the first of a segment when the stride before it is not a kept strid
 
 ## Reading the results
 {small_text}
-
-- **Even with the oracle phase a generic profile misses by {generic.min():.0f} to {generic.max():.0f} %** of the stride peak. A fixed profile cannot follow stride-to-stride and person-to-person variation. The subject's own mean profile (from the subject's other strides) brings it to {floor_own.min():.0f} to {floor_own.max():.0f} %: {own_share.min():.0f} to {own_share.max():.0f} % of the generic error is the difference between people, not between strides. Tuning the profile to the user gains {own_gain.min():.0f} to {own_gain.max():.0f} points, more than replacing the time-based estimate with the oracle (next two points). With only {len(subjects)} subjects the generic profile is a poor population mean, so this gap will shrink with more subjects.
+- **Even with the oracle phase a generic profile misses by {generic.min():.0f} to {generic.max():.0f} %** of the stride peak: a fixed profile cannot follow stride-to-stride and person-to-person variation. On the {tm}, with a median of {tm_per_subject:.0f} strides per subject and speed, the subject's own mean profile (from the subject's other strides) brings the error from {e.loc["oracle", tm]:.1f} to {e.loc["oracle, own profile", tm]:.1f} %, so about {100 * (1 - e.loc["oracle, own profile", tm] / e.loc["oracle", tm]):.0f} % of the generic error there is the difference between people. That gain ({e.loc["oracle", tm] - e.loc["oracle, own profile", tm]:.1f} points) is larger than the cost of the time-based phase estimate ({estimator_cost[tm]:.1f} points). Overground ({", ".join(over_names)}) each subject has a median of {over_median:.0f} strides per condition, so the own profile is itself a noisy estimate and changes the error by {over_gain.min():+.1f} to {over_gain.max():+.1f} points; those columns cannot separate the two kinds of variation.
 - **On {tm} the time-based estimate is nearly as good as the oracle**: its phase error is {tm_phase.get(False, float("nan")):.1f} % of the cycle on strides at a steady speed and {tm_phase.get(True, float("nan")):.1f} % on the first stride after a speed change or a dropped stride, and it adds {added[tm]:+.1f} percentage points to the command error.
-- **On stairs and ramps it is worse**, adding {added.drop(tm, errors="ignore").min():+.1f} to {added.drop(tm, errors="ignore").max():+.1f} points. Steady stair and ramp segments are only a few strides long, so {climb_share:.0f} % of their kept strides are the first of a segment, and the estimator predicts their duration from a stride of another activity (level walking or a transition). On those first strides it adds {climb_penalty:+.1f} points on average.
+- **On stairs and ramps it is worse**, adding {added.drop(tm, errors="ignore").min():+.1f} to {added.drop(tm, errors="ignore").max():+.1f} points. Steady stair and ramp segments are only a few strides long, so {climb_share:.0f} % of their kept strides are the first of a segment, and the estimator predicts their duration from a stride of another activity (level walking or a transition); those first strides add {climb_penalty:+.1f} points on average. {later_text}
 - **Detection latency shifts the whole command later**, including the steep rise and fall of push-off. On {tm} the error grows from {e.loc["time, 0 ms", tm]:.1f} % without latency to {e.loc[last_name, tm]:.1f} % at {1000 * DELAYS_S[-1]:.0f} ms, about {per_10ms:.1f} points per 10 ms. If the latency is known and constant, the estimator can back-date the heel strike and return to the no-latency row.
 - **For scale**: the torque controller tracks its reference to {tracking:.1f} % RMS on treadmill walking at 1.2 m/s (`results/tracking.md`), far below these command errors. In a phase-scheduled ankle the reference limits the result, not the actuator.
 

@@ -244,7 +244,9 @@ def write_markdown(summary: pd.DataFrame, chosen: dict[str, str], subjects: list
             continue
         timing = rows.iloc[:, 10]
         checks.append(
-            f"- {activity}: peak plantarflexion moment between {timing.min()} and {timing.max()} % of the cycle "
+            f"- {activity}: peak plantarflexion moment "
+            + (f"at {timing.min()} %" if timing.min() == timing.max() else f"between {timing.min()} and {timing.max()} %")
+            + " of the cycle "
             f"(late stance) in all {len(rows)} conditions, with net positive ankle work in "
             f"{int((rows['net_work_J_per_kg'] > 0).sum())} of {len(rows)}."
         )
@@ -267,11 +269,13 @@ def write_markdown(summary: pd.DataFrame, chosen: dict[str, str], subjects: list
         "| activity | condition | source | peak dorsiflexion (deg, at %) | peak plantarflexion (deg, at %) |",
         "|---|---|---|---|---|",
     ]
+    offsets = []
     for (activity, condition), reading in FIGURE_READINGS.items():
         row = summary[(summary["activity"] == activity) & (summary["condition"] == condition)]
         if row.empty:
             continue
         r = row.iloc[0]
+        offsets += [r["max_dorsiflexion_deg"] - reading["dorsiflexion"][0], reading["plantarflexion"][0] - r["max_plantarflexion_deg"]]
         lines.append(
             f"| {activity} | {condition} | dataset page figure | {reading['dorsiflexion'][0]} ({reading['dorsiflexion'][1]}) "
             f"| {reading['plantarflexion'][0]} ({reading['plantarflexion'][1]}) |"
@@ -282,13 +286,13 @@ def write_markdown(summary: pd.DataFrame, chosen: dict[str, str], subjects: list
         )
     lines += [
         "",
-        "The shapes and timings agree, but the angles here sit about 10 to 17 degrees further into "
-        "dorsiflexion. The difference is a constant offset: the `ik` folder holds absolute OpenSim joint "
+        f"The shapes and timings agree, but the peaks here sit {min(offsets):.0f} to {max(offsets):.0f} degrees further into "
+        f"dorsiflexion (median {np.median(offsets):.0f}). The difference is an offset: the `ik` folder holds absolute OpenSim joint "
         "angles, while the dataset's `ik_offset` folder (added in the 2024 update) holds the same angles "
         "relative to each subject's static standing pose. For AB06 the right-ankle difference between "
-        "the two is exactly 13.6 degrees at every sample of the treadmill trials, and subtracting it brings "
-        "the peaks here to within about 5 degrees of the figures, which are consistent with offset-corrected "
-        "angles. The actuator model uses only angle *changes* "
+        "the two is exactly 13.6 degrees at every sample of the treadmill trials. A per-subject offset of "
+        "that size accounts for most of the gap, so the page's figures are consistent with offset-corrected "
+        "angles; the rest of the spread is within what reading a figure by eye allows. The actuator model uses only angle *changes* "
         "(motor speed and acceleration depend on the angular velocity and acceleration), and the rest "
         "angle of the parallel spring is a design variable, so the offset does not affect any result. "
         "The `ik` angles are kept so that only the folders listed in `data/README.md` are needed.",

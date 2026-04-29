@@ -153,12 +153,22 @@ def main() -> int:
         ("SEA, least energy with no limits", free),
         ("rigid, least energy with no limits", rigid_free),
     ]
+    if not np.isnan(rigid["ratio"]):
+        designs.append(("rigid, least energy within the drive limits", rigid))
     rows = [[name, *describe(d), violated(d)] for name, d in designs]
     sens = sensitivity(profile, motor)
     rigid_note = (
-        "No rigid actuator (k = inf) meets the drive limits at any ratio from 30 to 2000"
+        "No rigid actuator (k = inf) meets the drive limits at any ratio from 30 to 2000. A rigid actuator needs a "
+        "high ratio to keep the push-off current under 30 A, and at that ratio the back EMF at the push-off joint "
+        "speed alone exceeds the available voltage. The spring lets the joint move during push-off while the motor "
+        "turns more slowly, so the same ratio fits inside the voltage limit."
         if np.isnan(rigid["ratio"])
-        else f"The best rigid actuator within the drive limits uses N = {rigid['ratio']:.0f} and {rigid['energy']:.1f} J"
+        else f"The best rigid actuator within the drive limits needs N = {rigid['ratio']:.0f} and "
+        f"{rigid['energy']:.1f} J per stride, {rigid['energy'] / opt['energy'] - 1:.0%} more than the SEA. "
+        "Without a spring the motor turns with the joint, so the back EMF at the push-off joint speed caps the ratio; "
+        "at that low ratio the push-off torque needs a large current and the copper loss grows. The spring lets the "
+        "joint move during push-off while the motor turns more slowly, so the SEA can use a higher ratio within the "
+        "same voltage."
     )
     saving = 1.0 - opt["energy"] / rigid_free["energy"]
     k_kg = opt["stiffness"] / DESIGN_MASS_KG
@@ -181,10 +191,10 @@ Spring stiffness `k` and total gear ratio `N` of the series elastic actuator tha
 
 {table(header, rows)}
 
-- The least-energy design within the drive limits is **k = {opt['stiffness']:.0f} N·m/rad ({k_kg:.2f} N·m/rad per kg of user mass), N = {opt['ratio']:.0f}**, at {opt['energy']:.1f} J per stride ({opt['energy'] / profile.stride_time:.1f} W average). That is {saving:.0%} less than the best rigid actuator, which also breaks the drive limits.
-- {rigid_note}. A rigid actuator needs a high ratio to keep the push-off current under 30 A, and at that ratio the back EMF at the push-off joint speed alone exceeds the available voltage. The spring lets the joint move during push-off while the motor turns more slowly, so the same ratio fits inside the voltage limit.
+- The least-energy design within the drive limits is **k = {opt['stiffness']:.0f} N·m/rad ({k_kg:.2f} N·m/rad per kg of user mass), N = {opt['ratio']:.0f}**, at {opt['energy']:.1f} J per stride ({opt['energy'] / profile.stride_time:.1f} W average). That is {saving:.0%} less than the best rigid actuator even when the rigid one may ignore the drive limits.
+- {rigid_note}
 - Without any limits the optimum moves to N = {free['ratio']:.0f}; the voltage limit is what holds the ratio down. Energy is flat near the optimum: the contour shows a long valley along which `k` and `N` trade off.
-- **No design meets the motor's continuous current rating.** The lowest stride RMS current anywhere on the grid is {min_rms:.2f} A against the {limits.rms_current:.2f} A rating, so this motor would overheat in sustained walking for an {DESIGN_MASS_KG:.0f} kg user. Its copper loss is set mostly by the joint torque reflected through the gear, which no series spring can reduce. Section 11 returns to this with a parallel spring, which carries part of the torque itself.
+- **No design meets the motor's continuous current rating.** The lowest stride RMS current anywhere on the grid is {min_rms:.2f} A against the {limits.rms_current:.2f} A rating ({min_rms / limits.rms_current - 1:.0%} above it), and the least-energy design draws {opt['rms_current']:.2f} A ({opt['rms_current'] / limits.rms_current - 1:.0%} above), so in sustained walking for an {DESIGN_MASS_KG:.0f} kg user this motor runs hotter than its continuous rating allows. Its copper loss is set mostly by the joint torque reflected through the gear, which no series spring can reduce. Section 11 returns to this with a parallel spring, which carries part of the torque itself.
 - {drive_share:.0%} of the designs on the grid meet the drive limits.
 
 ## Sensitivity to the assumptions

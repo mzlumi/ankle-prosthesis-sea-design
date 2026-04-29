@@ -44,6 +44,7 @@ TABLE = RESULTS_DIR / "profiles" / "sizing_modes.csv"
 CONTOUR = RESULTS_DIR / "figures" / "sizing_modes_contour.png"
 BY_CONDITION = RESULTS_DIR / "figures" / "sizing_by_condition.png"
 RATIOS = np.geomspace(30.0, 2000.0, 600)
+MIN_SUBJECTS = 5  # summary statistics use conditions with at least this many subjects
 
 
 def condition_value(condition: str) -> float:
@@ -238,9 +239,9 @@ def main() -> int:
     rep_feas = rep[rep["feasible"]]
     k_lo, k_hi = rep_feas["stiffness_Nm_per_rad"].min(), rep_feas["stiffness_Nm_per_rad"].max()
     n_lo, n_hi = rep_feas["ratio"].min(), rep_feas["ratio"].max()
-    multi = feas[feas["n_subjects"] >= 2]
+    multi = feas[feas["n_subjects"] >= MIN_SUBJECTS]
     k_q = multi["stiffness_Nm_per_rad"].quantile([0.1, 0.9]).to_numpy()
-    tread = feas[feas["activity"] == "treadmill"].copy()
+    tread = multi[multi["activity"] == "treadmill"].copy()
     tread["speed"] = tread["condition"].map(condition_value)
     slow, fast = tread.iloc[0], tread.iloc[-1]
     voltage_bound = int(feas["binding"].str.contains("voltage").sum())
@@ -256,15 +257,47 @@ def main() -> int:
         + "."
     )
     thermal_ok = table[table["thermal_feasible"]]
+    ok_speeds = [float(c.split()[0]) for c in thermal_ok.loc[thermal_ok["activity"] == "treadmill", "condition"]]
+    walk_note = (
+        "No treadmill speed is among them."
+        if not ok_speeds
+        else f"The fastest treadmill speed among them is {max(ok_speeds):.2f} m/s."
+    )
+    few = table[table["n_subjects"] < MIN_SUBJECTS]
+    single_text = (
+        f"the conditions with fewer than {MIN_SUBJECTS} subjects ("
+        + ", ".join(f"{ACTIVITY_NAMES[a]} {c}" for a, c in zip(few["activity"], few["condition"]))
+        + ") should not be read as a trend"
+        if not few.empty
+        else f"every condition here has at least {MIN_SUBJECTS} subjects"
+    )
     thermal_text = (
         "No condition has a design that also meets the motor's continuous current rating."
         if thermal_ok.empty
         else f"{len(thermal_ok)} of {len(table)} conditions have a design that also meets the motor's continuous "
         "current rating: " + ", ".join(f"{ACTIVITY_NAMES[a]} {c}" for a, c in zip(thermal_ok["activity"],
                                                                                     thermal_ok["condition"]))
-        + ". Level walking at 1.2 m/s and faster is not among them."
+        + ". "
+        + walk_note
     )
     rigid_ok = feas["rigid_energy_J"].notna()
+    rigid_parts = []
+    for activity in ACTIVITIES:
+        rows = feas[feas["activity"] == activity]
+        ok = rows[rows["rigid_energy_J"].notna()]
+        if ok.empty:
+            continue
+        name = ACTIVITY_NAMES[activity]
+        if len(ok) == len(rows):
+            rigid_parts.append(f"every {name} condition")
+        elif activity == "treadmill" and list(ok.index) == list(rows.index[: len(ok)]):
+            rigid_parts.append(f"{name} up to {ok['condition'].iloc[-1]}")
+        else:
+            rigid_parts.append(f"{name} at " + ", ".join(ok["condition"]))
+    rigid_fail = [ACTIVITY_NAMES[a] for a in ACTIVITIES
+                  if (feas["activity"] == a).any() and feas.loc[feas["activity"] == a, "rigid_energy_J"].isna().any()]
+    stair_d = descent[descent["activity"] == "stairdescent"]["energy_J"]
+    ramp_d = descent[descent["activity"] == "rampdescent"]["energy_J"]
     text = f"""# Sizing across activities
 
 The spring stiffness `k` and gear ratio `N` that minimize the motor's electrical energy per stride, sized separately for each activity and condition in the dataset. Same actuator, user mass ({DESIGN_MASS_KG:.0f} kg) and bus voltage ({BUS_VOLTAGE:.0f} V) as `results/sizing_levelwalk.md`. Each optimum meets the drive limits (voltage, 30 A peak current, motor speed); it is found by scanning 600 ratios from 30 to 2000 with the closed-form optimum in compliance clipped to the feasible interval at each ratio (`anklesea.sizing.optimize`, checked against the grid search in `results/convex_check.md`).
@@ -285,12 +318,12 @@ Bold rows are the conditions in the contour figure. "Rigid" is the best rigid ac
 
 ## Observations
 
-- **The stiffness changes little; the ratio changes a lot.** Over the conditions with at least two subjects, 80 % of the optimal stiffnesses lie between {k_q[0]:.0f} and {k_q[1]:.0f} N·m/rad (representative conditions: {k_lo:.0f} to {k_hi:.0f}), while the ratio spans {n_lo:.0f} to {n_hi:.0f} over the representative conditions and falls from {slow['ratio']:.0f} at {slow['condition']} to {fast['ratio']:.0f} at {fast['condition']} on the treadmill. The voltage limit binds in {voltage_bound} of {len(feas)} conditions: faster joint motion means more back EMF per unit ratio, so the ratio has to drop, and the spring stays near the value that cancels motor motion at push-off.
-- **Descent returns energy.** On ramp and stair descent the ankle does net negative work, so with ideal regeneration the motor's energy per stride is negative ({descent['energy_J'].min():.1f} to {descent['energy_J'].max():.1f} J): the actuator would charge the battery. Without regeneration the same designs cost {descent['energy_no_regen_J'].min():.1f} to {descent['energy_no_regen_J'].max():.1f} J. The optimum with regeneration maximizes what is recovered, which is only meaningful if the driver and battery can take it back; section 10 uses both measures.
+- **The stiffness changes little; the ratio changes a lot.** Over the conditions with at least {MIN_SUBJECTS} subjects, 80 % of the optimal stiffnesses lie between {k_q[0]:.0f} and {k_q[1]:.0f} N·m/rad (representative conditions: {k_lo:.0f} to {k_hi:.0f}), while the ratio spans {n_lo:.0f} to {n_hi:.0f} over the representative conditions and falls from {slow['ratio']:.0f} at {slow['condition']} to {fast['ratio']:.0f} at {fast['condition']} on the treadmill. The voltage limit binds in {voltage_bound} of {len(feas)} conditions: faster joint motion means more back EMF per unit ratio, so the ratio has to drop, and the spring stays near the value that cancels motor motion at push-off.
+- **Descent returns energy.** On ramp and stair descent the ankle does net negative work, so with ideal regeneration the motor can charge the battery: stair descent returns {-stair_d.max():.1f} to {-stair_d.min():.1f} J per stride, while ramp descent roughly breaks even ({ramp_d.min():.1f} to {ramp_d.max():.1f} J) because its smaller negative joint work barely covers the motor losses. Without regeneration the same designs cost {descent['energy_no_regen_J'].min():.1f} to {descent['energy_no_regen_J'].max():.1f} J. The optimum with regeneration maximizes what is recovered, which is only meaningful if the driver and battery can take it back; section 10 uses both measures.
 - {infeasible_text}
 - {thermal_text}
-- A rigid actuator meets the drive limits in {int(rigid_ok.sum())} of {len(feas)} conditions that have a feasible SEA design, mostly slow walking and stairs, where the joint moves slowly at peak torque.
-- Profiles that rest on one subject or a handful of strides (see the subjects column) are less reliable; a single-subject outlier such as ramp ascent at 9.2 deg should not be read as a trend. The treadmill profiles rest on every stride of every subject.
+- A rigid actuator meets the drive limits in {int(rigid_ok.sum())} of {len(feas)} conditions that have a feasible SEA design: {"; ".join(rigid_parts)}. It fails in the other {", ".join(rigid_fail[:-1]) + " and " + rigid_fail[-1] if len(rigid_fail) > 1 else "".join(rigid_fail)} conditions, the faster and steeper ones, where the joint moves fast at high torque and the back EMF caps the ratio.
+- Profiles that rest on one subject or a handful of strides (see the subjects column) are less reliable; {single_text}. The treadmill profiles use every stride of each subject who walked at that speed.
 
 Section 10 (`results/cross_mode.md`) asks what a design tuned for level walking costs in the other activities, and what a compromise design looks like.
 """

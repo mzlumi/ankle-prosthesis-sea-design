@@ -168,6 +168,12 @@ def main() -> int:
 
     comp_s, comp_sw = stance["compromise"], swing["compromise"]
     walk_sw = swing["walking"]
+    short = [name for name, m in (("compromise", comp_sw), ("walking-tuned", walk_sw)) if m.phase_margin_deg < TARGET_PM_DEG]
+    swing_verdict = (
+        f"both short of the {TARGET_PM_DEG:.0f} deg of target 2" if len(short) == 2
+        else f"so the {short[0]} design misses target 2" if short
+        else f"both within target 2"
+    )
     worst_model = max(tracking[(a, "compromise", "model")].rms_error_pct() for a in MIX_ACTIVITIES)
     worst_static = max(tracking[(a, "compromise", "static")].rms_error_pct() for a in MIX_ACTIVITIES)
     level = profiles[conditions["level"]]
@@ -193,13 +199,13 @@ The torque reference comes from the gait data, so the bandwidth target does too:
 
 ## Tuning
 
-PD by pole placement on the fixed-output plant (derivation in the module docstring of `anklesea.torque_control`): the closed-loop poles are put at {PLACEMENT_HZ:.0f} Hz with damping 0.7, the integral corner at {INTEGRAL_FRACTION} of that frequency and the derivative filter at ten times it. The proportional gain raises the spring-rotor resonance from about 3 Hz to {PLACEMENT_HZ:.0f} Hz; the derivative gain damps it. The gains are tiny in N·m per N·m because the gear multiplies motor torque by `N eta`, about 300.
+PD by pole placement on the fixed-output plant (derivation in the module docstring of `anklesea.torque_control`): the closed-loop poles are put at {PLACEMENT_HZ:.0f} Hz with damping 0.7, the integral corner at {INTEGRAL_FRACTION} of that frequency and the derivative filter at ten times it. The proportional gain raises the spring-rotor resonance from {params['compromise'].fixed_resonance / HZ:.1f} Hz (compromise design) to {PLACEMENT_HZ:.0f} Hz; the derivative gain damps it. The gains are tiny in N·m per N·m because the gear multiplies motor torque by `N eta`, {params['compromise'].gain:.0f} for the compromise design.
 
 | design | Kp (N·m/N·m) | Ki (1/s) | Kd (ms) | derivative filter (ms) | Kp in A per N·m of error |
 |---|---|---|---|---|---|
 {chr(10).join(gain_rows)}
 
-The first tuning put the poles at {FIRST_TRY[0]:.0f} Hz with the integral corner at {FIRST_TRY[1]} of that. It met targets 1 and 2, but only just: for the compromise design the closed-loop response dipped almost to -3 dB just above the stride frequency ({stride_hz:.2f} Hz), and feedback alone left {first_none_err[("compromise", "first")]:.0f} % RMS error. Bandwidth measured at -3 dB says nothing about how flat the response is below it, and a gait torque has most of its power at the first few stride harmonics, so what matters is the loop gain there. A higher placement and integral corner raise it; the integral corner cannot go much higher, because an integrator ahead of a lightly damped resonance makes the loop conditionally stable (it would turn unstable if its gain dropped), which `loop_metrics` reports as a lower gain margin.
+The first tuning put the poles at {FIRST_TRY[0]:.0f} Hz with the integral corner at {FIRST_TRY[1]} of that. It met the bandwidth target and the stance margins, but the loop gain at the stride harmonics was low: for the compromise design the closed loop already sagged below 0 dB under {TARGET_BANDWIDTH_HZ:.0f} Hz, the sensitivity at the stride frequency ({stride_hz:.2f} Hz) was weaker, and feedback alone left {first_none_err[("compromise", "first")]:.0f} % RMS error (table below). Bandwidth measured at -3 dB says nothing about how flat the response is below it, and a gait torque has most of its power at the first few stride harmonics, so what matters is the loop gain there. A higher placement and integral corner raise it; the integral corner cannot go much higher, because an integrator ahead of a lightly damped resonance makes the loop conditionally stable (it would turn unstable if its gain dropped), which `loop_metrics` reports as a lower gain margin.
 
 | design | tuning | pole placement (Hz) | integral corner / placement | bandwidth (Hz) | lowest \\|T\\| up to {TARGET_BANDWIDTH_HZ:.0f} Hz (dB) | \\|S\\| at the stride frequency (dB) | phase margin (deg) | worst RMS error, feedback only (%) |
 |---|---|---|---|---|---|---|---|---|
@@ -215,7 +221,7 @@ The first tuning put the poles at {FIRST_TRY[0]:.0f} Hz with the integral corner
 
 *Top: closed-loop torque response and sensitivity with the {LOOP_DELAY * 1e3:.1f} ms delay. Bottom: steady-state tracking error over one stride for the compromise design, linear model; the grey line is the reference torque (scale on the right). {CITATION}*
 
-The closed-loop bandwidth, {comp_s.bandwidth_hz:.1f} Hz for the compromise design, is higher than the {PLACEMENT_HZ:.0f} Hz pole placement because the derivative term adds a zero. In stance the margins are comfortable. In swing the same gains act on the free-output plant, whose sharp resonance at the foot ({params['compromise'].free_resonance / HZ:.0f} Hz) moves the gain crossover up to {comp_sw.crossover_hz:.0f} Hz, where the delay costs more phase: the phase margin falls to {comp_sw.phase_margin_deg:.0f} deg for the compromise design and {walk_sw.phase_margin_deg:.0f} deg for the walking-tuned one, which misses target 2. The closed loop stays stable, but swing is where a delay or gain error would first cause trouble, and a gain schedule that lowers the gains in swing (where the torque reference is near zero anyway) would restore the margin. The closed loop also has a pole at zero in swing: the integrator cancels the free plant's zero at DC, since a free foot cannot hold a steady torque. In practice the integrator is reset or frozen in swing.
+The closed-loop bandwidth, {comp_s.bandwidth_hz:.1f} Hz for the compromise design, is higher than the {PLACEMENT_HZ:.0f} Hz pole placement because the derivative term adds a zero. In stance the margins are comfortable. In swing the same gains act on the free-output plant, whose sharp resonance at the foot ({params['compromise'].free_resonance / HZ:.0f} Hz) moves the gain crossover up to {comp_sw.crossover_hz:.0f} Hz, where the delay costs more phase: the phase margin falls to {comp_sw.phase_margin_deg:.1f} deg for the compromise design and {walk_sw.phase_margin_deg:.1f} deg for the walking-tuned one, {swing_verdict}. The closed loop stays stable, but swing is where a delay or gain error would first cause trouble. Lower gains in swing, where the torque reference is near zero anyway, would move the crossover down and should restore the margin; this gain schedule is not analyzed here. The closed loop also has a pole at zero in swing: the integrator cancels the free plant's zero at DC, since a free foot cannot hold a steady torque. In practice the integrator is reset or frozen in swing.
 
 ## Linear tracking
 

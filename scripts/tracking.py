@@ -36,18 +36,20 @@ from anklesea.torque_control import periodic_tracking
 REPORT = RESULTS_DIR / "tracking.md"
 FIGURE = RESULTS_DIR / "figures" / "tracking.png"
 OPTIONS = SimOptions()
+MIN_SUBJECTS = 5  # the fastest and steepest conditions are taken among those with at least this many subjects
 STYLES = {"compromise": ("#b45309", "-"), "walking": ("#1d4ed8", "--")}
 
 
 def conditions_to_run(profiles: dict) -> list[tuple[str, str]]:
-    """The daily-mix condition of every activity, plus the fastest and steepest ones."""
+    """The daily-mix condition of every activity, plus the fastest and steepest ones with enough subjects."""
     mix = mix_conditions(profiles)
     keys = [mix["level"]]
-    treadmill = [c for a, c in profiles if a == "treadmill"]
+    covered = [key for key, prof in profiles.items() if prof.n_subjects >= MIN_SUBJECTS]
+    treadmill = [c for a, c in covered if a == "treadmill"]
     keys.append(("treadmill", max(treadmill, key=lambda c: float(c.split()[0]))))
     for activity in ["rampascent", "rampdescent", "stairascent", "stairdescent"]:
         keys.append(mix[activity])
-        steepest = max((c for a, c in profiles if a == activity), key=lambda c: float(c.split()[0]))
+        steepest = max((c for a, c in covered if a == activity), key=lambda c: float(c.split()[0]))
         if steepest != mix[activity][1]:
             keys.append((activity, steepest))
     return keys
@@ -91,11 +93,13 @@ def main() -> int:
             cells.append(f"{r.rms_error_pct():.2f} ({100 * sat:.0f} %)")
         compare_rows.append(f"| {label(key)} | " + " | ".join(cells) + " |")
 
-    # The first version's anti-windup, on the fastest walking condition.
-    fast = keys[1]
+    # The first version's anti-windup, on the fastest walking condition of any subject count.
+    fast = max((k for k in profiles if k[0] == "treadmill"), key=lambda k: float(k[1].split()[0]))
+    fast_runs = {cname: runs.get((fast, "compromise", cname)) or simulate(
+        profiles[fast], DESIGN_MASS_KG, controllers["compromise"][cname], drive, options=OPTIONS) for cname in ["PID", "DOB"]}
     naive_rows = []
     for cname in ["PID", "DOB"]:
-        good = runs[(fast, "compromise", cname)]
+        good = fast_runs[cname]
         naive = simulate(profiles[fast], DESIGN_MASS_KG, controllers["compromise"][cname], drive,
                          options=replace(OPTIONS, naive_windup=True))
         naive_rows.append(f"| {cname} | {naive.rms_error_pct():.2f} | {good.rms_error_pct():.2f} |")
@@ -205,7 +209,7 @@ RMS error in % of peak torque, with the share of the stride spent at the voltage
 
 ## What did not work first
 
-The first version of the simulation froze the PID integrator only when the current was clipped and fed the DOB the torque command it had computed. In {label(fast)}, where the compromise design's drive is saturated for {100 * runs[(fast, 'compromise', 'PID')].voltage_saturated:.0f} % of the stride, that gave:
+The first version of the simulation froze the PID integrator only when the current was clipped and fed the DOB the torque command it had computed. In {label(fast)} ({profiles[fast].n_subjects} subjects, a stress case beyond the conditions above), where the compromise design's drive is saturated for {100 * fast_runs['PID'].voltage_saturated:.0f} % of the stride, that gave:
 
 | controller | RMS error, first version (%) | RMS error, final anti-windup (%) |
 |---|---|---|

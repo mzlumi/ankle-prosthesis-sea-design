@@ -168,7 +168,7 @@ def main() -> int:
 
 ![Parallel spring](figures/parallel_spring.png)
 
-*Left: joint moment against angle over the stride, the parallel spring's line and what remains for the actuator. Middle: motor current. Right: RMS current of the walking-tuned designs in each activity against the motor's rating. Data: Camargo et al. (2021), CC BY 4.0.*
+*Left: joint moment against angle over the stride, the parallel spring's line and what remains for the actuator. Second: RMS current of the least-energy design within the drive limits for each parallel spring on the brute-force grid. Third: motor current over the stride. Right: RMS current of the walking-tuned designs in each activity against the motor's rating. Data: Camargo et al. (2021), CC BY 4.0.*
 
 ## Level walking
 
@@ -188,7 +188,7 @@ A parallel spring tuned to the level-walking moment-angle relation acts the same
 
 ## Limits of this design
 
-- The spring is linear and acts in swing too, when the joint moment is near zero; the motor then holds the spring's torque, which is visible in the middle panel after toe-off. A spring that engages only in stance (a clutch or a unidirectional spring, as in several powered ankles) would avoid that; it is not modeled because it makes the problem non-smooth.
+- The spring is linear and acts in swing too, when the joint moment is near zero; the motor then holds the spring's torque, which is visible in the third panel after toe-off. A spring that engages only in stance (a clutch or a unidirectional spring, as in several powered ankles) would avoid that; it is not modeled because it makes the problem non-smooth.
 - The rest angle is relative to the `ik` angle convention; it would be set during fitting.
 - A parallel spring tuned for one activity loads the actuator in others, as the table above shows.
 """

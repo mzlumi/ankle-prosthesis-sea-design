@@ -119,6 +119,7 @@ def main() -> int:
     for extra in [1, 2, 4]:
         lin_cases.append((f"loop delay {(1.5 + extra):.1f} ms", comp, LOOP_DELAY + extra * TS))
     lin_rows = []
+    delay_cases: dict[str, list[tuple[float, float, bool]]] = {name: [] for name in ctrls}
     for label, actual, delay in lin_cases:
         cells = []
         for cname, c in ctrls.items():
@@ -126,11 +127,20 @@ def main() -> int:
             sw = loop_metrics(c.closed_loop(w, actual, "free", delay).loop, w)
             stable = c.is_stable(actual, "fixed", delay) and c.is_stable(actual, "free", delay)
             cells.append(f"{st.phase_margin_deg:.0f} / {sw.phase_margin_deg:.0f}{'' if stable else ' **unstable**'}")
+            if label.startswith("loop delay"):
+                delay_cases[cname].append((delay, sw.phase_margin_deg, stable))
         lin_rows.append(f"| {label} | " + " | ".join(cells) + " |")
     st_nom = loop_metrics(ctrls["PID"].closed_loop(w, None, "fixed", LOOP_DELAY).loop, w)
     sw_nom = loop_metrics(ctrls["PID"].closed_loop(w, None, "free", LOOP_DELAY).loop, w)
     delay_margin_stance = np.radians(st_nom.phase_margin_deg) / (HZ * st_nom.crossover_hz)
     delay_margin_swing = np.radians(sw_nom.phase_margin_deg) / (HZ * sw_nom.crossover_hz)
+    dob_unstable = [d for d, _, ok in delay_cases["DOB"] if not ok]
+    worst_delay = min(dob_unstable) if dob_unstable else max(d for d, _, _ in delay_cases["DOB"])
+    pid_swing_pm = next(pm for d, pm, _ in delay_cases["PID"] if np.isclose(d, worst_delay))
+    delay_text = (
+        f"at {worst_delay * 1e3:.1f} ms the PID's swing margin is down to {pid_swing_pm:.0f} deg and "
+        + ("the DOB's swing loop is unstable." if dob_unstable else "both swing loops are still stable.")
+    )
 
     # Coupled stability with passive environments.
     envs = env_grid()
@@ -273,7 +283,7 @@ The tracking simulations prescribe the joint motion. In use, the joint is moved 
 - **Spring stiffness is the parameter that matters most, and through the sensor, not the controller.** The torque is computed as nominal stiffness times deflection, so a spring 20 % softer than assumed reads 25 % high and the loop delivers 20 % too little torque: the worst error grows from {nominal_err:.1f} % to {soft_def:.1f} %. With a load cell the same spring error costs almost nothing ({soft_cell:.1f} %). The spring must be calibrated on the assembled actuator, and its stiffness checked for drift with temperature and wear.
 - **Motor constants** (torque constant, rotor inertia, friction) change the feedforward and the loop gain; the feedback absorbs these errors and the tracking stays within the target.
 - **Noise** matters through the joint acceleration estimate: the feedforward multiplies it by the reflected inertia, so encoder noise becomes torque noise and, at high levels, voltage saturation (the saturated share of the stride grows with the noise in the table). At the quantization level of a 14-bit encoder the effect is invisible; {noise_text}. A lower derivative filter cut-off would trade noise for lag.
-- **Delay** costs phase margin at about {np.degrees(HZ * st_nom.crossover_hz * 1e-3):.0f} deg per millisecond in stance and {np.degrees(HZ * sw_nom.crossover_hz * 1e-3):.0f} deg per millisecond in swing, where the crossover is higher. Swing therefore sets the delay budget: at 5.5 ms the PID's swing margin is nearly gone and the DOB's swing loop is unstable. The tracking simulation does not show this, because it prescribes the joint motion and so never has a free foot; the extra-delay rows of the first table only describe stance-like tracking.
+- **Delay** costs phase margin at about {np.degrees(HZ * st_nom.crossover_hz * 1e-3):.0f} deg per millisecond in stance and {np.degrees(HZ * sw_nom.crossover_hz * 1e-3):.0f} deg per millisecond in swing, where the crossover is higher. Swing therefore sets the delay budget: {delay_text} The tracking simulation does not show this, because it prescribes the joint motion and so never has a free foot; the extra-delay rows of the first table only describe stance-like tracking.
 - **Coupled stability**: PD alone is stable with every environment in the grid. With the model feedforward and the delay, both PID and DOB destabilize a light inertia ({light} kg m², a foot) on a soft, lightly damped spring: in a finer scan (1 to 1000 N·m/rad) the coupled system is unstable for every stiffness from the lowest tried, {min(unstable_k):.0f}, up to {max(unstable_k):.0f} N·m/rad. These environments resonate at {np.sqrt(min(unstable_k) / light) / HZ:.0f} to {np.sqrt(max(unstable_k) / light) / HZ:.0f} Hz, the band where `results/torque_dob.md` found the delayed feedforward makes the actuator non-passive. Environment damping of {b_needed:.3f} N·m·s/rad restores stability over that whole range (the most demanding case is {worst_k:.0f} N·m/rad), the same order as the passivity violation found there. Whether a real foot meets such an environment (lightly held by something soft, in swing) is not established here; the safe reading is that the joint-motion feedforward should be faded out in swing, together with the integrator, as PD alone is stable with every environment tried.
 """
     REPORT.write_text(text)
