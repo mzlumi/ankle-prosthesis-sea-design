@@ -20,10 +20,10 @@ All numbers are for 22 subjects, scaled to an 80 kg user, with one real motor, g
 - **Robustness.** The spring used as a torque sensor is the weak point (a spring 20 % softer than assumed: 11.2 % error, against 1.1 % with a load cell). The delay margin is 4.3 ms in swing, and PID or DOB with feedforward can go unstable against a light, soft, lightly damped load ([`results/robustness.md`](results/robustness.md)).
 - **Phase-scheduled command.** A mean torque profile looked up at gait phase misses the person's own ankle moment by 10 to 31 %, even with perfect phase; about half of that is the difference between people. A simple time-based phase estimate adds 1 point on the treadmill and 1 to 4 points on ramps and stairs. The reference, not the actuator, limits the device ([`results/phase_schedule.md`](results/phase_schedule.md)).
 
-This repository is part of a set that goes from a body-worn sensor to a device controller:
-- [imu-opensim-validation](https://github.com/mzlumi/imu-opensim-validation): IMU joint angles validated against marker-based motion capture.
-- [imu-locomotion-gait-phase](https://github.com/mzlumi/imu-locomotion-gait-phase): locomotion mode and continuous gait phase from wearable IMUs, on the same Camargo dataset. Its estimator was not ready when the phase-scheduled command here was built, so this repository uses a simple time-based phase estimate in its place; plugging that estimator in is the next step.
-- [drop-foot-ankle-exo-sim](https://github.com/mzlumi/drop-foot-ankle-exo-sim): an IMU-triggered ankle exoskeleton in a neuromuscular simulation of drop-foot gait.
+I plan to grow this into a set of projects that goes from a body-worn sensor to a device controller, and to build the other parts some day:
+- IMU joint angles validated against marker-based motion capture.
+- Locomotion mode and continuous gait phase from wearable IMUs, on the same Camargo dataset. Its phase estimator would replace the simple time-based phase estimate used here.
+- An IMU-triggered ankle exoskeleton in a neuromuscular simulation of drop-foot gait.
 
 ## Adapted from
 
@@ -70,7 +70,7 @@ The saved documents and their original locations are listed in [`docs/SOURCES.md
 - **All locomotion modes.** The homework sizes the actuator for level walking. Here the sizing is done for every mode and condition, to show how the optimal stiffness and gear ratio move between walking, ramps and stairs.
 - **The cost of tuning for walking.** How much extra energy a design tuned for level walking uses on stairs and ramps, compared with each mode's own optimum, and whether one compromise design (weighted over modes) loses much anywhere.
 - **A parallel spring.** Add a parallel spring option and compare energy and peak current with the pure SEA.
-- **Phase-scheduled torque command.** Generate the torque reference from gait phase and mode and compare it with the moment each person actually produced, with the dataset's own gait events as an oracle phase and with a causal time-based phase estimate (heel strikes detected 0, 25 or 50 ms late). The estimator from [imu-locomotion-gait-phase](https://github.com/mzlumi/imu-locomotion-gait-phase) was meant to take that place but is not ready yet.
+- **Phase-scheduled torque command.** Generate the torque reference from gait phase and mode and compare it with the moment each person actually produced, with the dataset's own gait events as an oracle phase and with a causal time-based phase estimate (heel strikes detected 0, 25 or 50 ms late). An IMU-based gait phase estimator, planned as a separate project, would take the place of the time-based one.
 - **Robustness.** Tracking and stability with errors in spring stiffness and motor constants, sensor noise, loop delay, and coupling to passive environments.
 
 ## Install and run
@@ -126,7 +126,7 @@ Each script writes a Markdown page to `results/` and its figure to `results/figu
 - [x] Parallel spring option
 - [x] SEA plant model, torque controller, Bode plots, disturbance observer
 - [x] Time-domain tracking with saturation, robustness study
-- [x] Phase-scheduled torque command (with a time-based phase estimate in place of the companion repository's estimator)
+- [x] Phase-scheduled torque command (with a time-based phase estimate; an IMU-based estimator is planned)
 - [x] Report and final README
 
 ## What I learned
